@@ -18,11 +18,15 @@
 <meta name="googlebot" content="index,follow,max-image-preview:large"/>
 <link rel="canonical" id="canonicalLink" href="/public/streamlivetv/"/>
 <meta property="og:type" content="website"/>
+<meta property="og:locale" content="ru_RU"/>
 <meta property="og:site_name" content="StreamLiveTV"/>
 <meta property="og:title" id="ogTitle" content="StreamLiveTV — прямые эфиры"/>
 <meta property="og:description" id="ogDescription" content="Смотрите live-каналы, подписывайтесь и получайте персональные рекомендации."/>
 <meta property="og:url" id="ogUrl" content="/public/streamlivetv/"/>
 <meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:title" id="twitterTitle" content="StreamLiveTV — прямые эфиры"/>
+<meta name="twitter:description" id="twitterDescription" content="Смотрите live-каналы, подписывайтесь и получайте персональные рекомендации."/>
+<meta name="keywords" content="онлайн тв, прямой эфир, live tv, streamlivetv, nonstopstream, радиостанции онлайн, телеканалы"/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -416,10 +420,18 @@ body{font-family:'Manrope',sans-serif;background:var(--bg);color:var(--text);dis
 .bear-card p{font-size:13px;color:var(--text2);line-height:1.45;margin-bottom:12px}
 .rewards-list{font-size:12px;color:var(--text2);text-align:left;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 12px;line-height:1.5;margin-bottom:12px}
 .rewards-list b{color:var(--text)}
+.reward-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid rgba(255,255,255,.06)}
+.reward-row:first-of-type{border-top:none}
+.reward-row button{background:var(--bg4);border:1px solid var(--border);color:var(--text2);border-radius:7px;padding:5px 8px;font-size:11px;font-weight:700;cursor:pointer}
+.reward-row button:hover{border-color:var(--accent);color:#fff}
 .bear-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 .bear-actions button{border:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer}
 .tap-primary{background:var(--accent);color:#fff}
 .tap-secondary{background:var(--bg4);color:var(--text2);border:1px solid var(--border)}
+.inactive-overlay{position:absolute;inset:0;background:rgba(5,8,14,.92);display:flex;align-items:center;justify-content:center;z-index:11;padding:18px}
+.inactive-card{max-width:420px;background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center}
+.inactive-card h4{font-size:16px;margin-bottom:6px}
+.inactive-card p{font-size:13px;color:var(--text2);line-height:1.45;margin-bottom:12px}
 </style>
 </head>
 <body>
@@ -450,6 +462,9 @@ body{font-family:'Manrope',sans-serif;background:var(--bg);color:var(--text);dis
     <!-- кнопка бургер только на мобиле -->
     <button class="icon-btn" id="btnBurger" onclick="openDrawer()" style="display:none">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <button class="icon-btn" id="btnSettings" onclick="switchView('settings')" title="Настройки">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
     </button>
   </div>
 </div>
@@ -492,6 +507,10 @@ body{font-family:'Manrope',sans-serif;background:var(--bg);color:var(--text);dis
     <button class="bn-tab" id="bnList" onclick="openDrawer()">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       Список
+    </button>
+    <button class="bn-tab" id="bnSettings" onclick="mobileTab('settings')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33"></path></svg>
+      Настройки
     </button>
   </div>
 </nav>
@@ -539,7 +558,7 @@ body{font-family:'Manrope',sans-serif;background:var(--bg);color:var(--text);dis
     <div class="bear3d">🧸</div>
     <h3>Мишка зовёт за Stars</h3>
     <p>Раз в 30 минут тапни по экрану, чтобы получить Stars и поддерживать активность.</p>
-    <div class="rewards-list"><b>Варианты обмена Stars:</b><br>• 50 ⭐ — буст рекомендаций «Подписки в приоритете» на 24 часа.<br>• 120 ⭐ — уникальная тема профиля на 3 дня.<br>• 250 ⭐ — участие в розыгрыше мерча/подписок.</div>
+    <div class="rewards-list" id="rewardsList"></div>
     <div class="bear-actions"><button class="tap-primary" id="claimStarsBtn">Тапнуть и получить ⭐</button><button class="tap-secondary" id="closeBearBtn">Позже</button></div>
   </div>
 </div>
@@ -559,8 +578,19 @@ const STORAGE_KEYS = {
   profile: 'nss_interest_profile',
   notifications: 'nss_live_notifications',
   stars: 'nss_stars_state',
-  rewardBoostUntil: 'nss_reward_boost_until'
+  rewardBoostUntil: 'nss_reward_boost_until',
+  rewardEffects: 'nss_reward_effects',
+  settings: 'nss_settings'
 };
+
+const REWARD_CATALOG = [
+  { id: 'subsPriority24h', cost: 50, title: 'Подписки в приоритете на 24 часа', durationMs: 24 * 60 * 60 * 1000, apply: () => ({ boostSubscriptions: true }) },
+  { id: 'profileTheme3d', cost: 120, title: 'Уникальная тема профиля на 3 дня', durationMs: 3 * 24 * 60 * 60 * 1000, apply: () => ({ uniqueTheme: true }) },
+  { id: 'merchRaffle', cost: 250, title: 'Билет в розыгрыш мерча/подписки', durationMs: 14 * 24 * 60 * 60 * 1000, apply: () => ({ raffleTickets: 1 }) },
+  { id: 'instantStars', cost: 80, title: 'Мгновенные +15 Stars', durationMs: 0, apply: () => ({ addStars: 15 }) },
+  { id: 'liveAlertsPro', cost: 90, title: 'Pro live-уведомления на 72 часа', durationMs: 72 * 60 * 60 * 1000, apply: () => ({ proAlerts: true }) },
+  { id: 'doubleClaimDay', cost: 160, title: 'Удвоенный Stars-тап на 24 часа', durationMs: 24 * 60 * 60 * 1000, apply: () => ({ doubleClaim: true }) }
+];
 
 let allCh = [], view = [];
 let currentCh = null, curView = 'grid';
@@ -572,6 +602,10 @@ const interestProfile = JSON.parse(localStorage.getItem(STORAGE_KEYS.profile) ||
 let liveSnapshot = JSON.parse(localStorage.getItem(STORAGE_KEYS.notifications) || '{}');
 let starsState = JSON.parse(localStorage.getItem(STORAGE_KEYS.stars) || '{\"stars\":0,\"nextClaimAt\":0}');
 let rewardBoostUntil = Number(localStorage.getItem(STORAGE_KEYS.rewardBoostUntil) || 0);
+let rewardEffects = JSON.parse(localStorage.getItem(STORAGE_KEYS.rewardEffects) || '{}');
+let appSettings = JSON.parse(localStorage.getItem(STORAGE_KEYS.settings) || '{"stopOnInactivity":true,"inactivityLimitMin":50,"defaultSource":0}');
+let inactivityTimer = null;
+let frameStoppedByInactivity = false;
 const isMobile = () => window.innerWidth <= 768;
 
 window.onload = () => {
@@ -580,6 +614,7 @@ window.onload = () => {
   bindSearch();
   initStarsLoop();
   initSeoDefaults();
+  initSettings();
   loadAllChannels();
   startNotificationPolling();
   maybeRequestNotificationPermission();
@@ -589,14 +624,23 @@ window.onload = () => {
 
 function initSeoDefaults() {
   const rootUrl = `${getBaseUrl()}/public/streamlivetv/`;
+  const path = window.location.pathname;
   document.getElementById('canonicalLink')?.setAttribute('href', rootUrl);
   document.getElementById('ogUrl')?.setAttribute('content', rootUrl);
+  setMeta('description', 'NonStopStream / StreamLiveTV — каталог прямых ТВ и радио эфиров, подписки, рекомендации и live-уведомления.');
+  if (/\/public\/streamlivetv\/[^/]+/i.test(path)) {
+    const slug = path.split('/').filter(Boolean).pop().replace(/-/g, ' ');
+    document.title = `${slug} — смотреть онлайн прямой эфир | NonStopStream`;
+    setMeta('description', `Смотрите ${slug} онлайн в прямом эфире на NonStopStream. Подписки, умные рекомендации и уведомления о live.`);
+  }
   const seo = document.getElementById('seoStructuredData');
   if (seo) seo.textContent = JSON.stringify({
     "@context": "https://schema.org",
-    "@type": "WebSite",
+    "@type": "CollectionPage",
     name: "StreamLiveTV",
     url: rootUrl,
+    about: "Каталог прямых ТВ и радио каналов",
+    isPartOf: { "@type": "WebSite", name: "NonStopStream", url: getBaseUrl() },
     potentialAction: { "@type": "SearchAction", target: `${rootUrl}?q={search_term_string}`, "query-input": "required name=search_term_string" }
   });
 }
@@ -607,11 +651,55 @@ function bindSearch() {
   document.getElementById('mobileSearchInline').addEventListener('input', e => renderSearchResults(e.target.value.toLowerCase().trim()));
 }
 
+function initSettings() {
+  curSrc = Number(appSettings.defaultSource || 0);
+  const activityEvents = ['mousemove','mousedown','keydown','touchstart','scroll'];
+  activityEvents.forEach(evt => window.addEventListener(evt, resetInactivityTimer, { passive: true }));
+  applyActiveThemeReward();
+}
+
+function saveSettings() {
+  localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(appSettings));
+  resetInactivityTimer();
+}
+
+function applyActiveThemeReward() {
+  const rewardThemeOn = hasActiveEffect('uniqueTheme');
+  document.documentElement.style.setProperty('--accent', rewardThemeOn ? '#8a5cff' : '#ff4040');
+}
+
+function resetInactivityTimer() {
+  if (!appSettings.stopOnInactivity || curView !== 'player') return;
+  if (frameStoppedByInactivity) return;
+  if (inactivityTimer) clearTimeout(inactivityTimer);
+  inactivityTimer = setTimeout(stopPlaybackForInactivity, Number(appSettings.inactivityLimitMin || 50) * 60 * 1000);
+}
+
+function stopPlaybackForInactivity() {
+  const frame = document.getElementById('embedFrame');
+  if (!frame || curView !== 'player') return;
+  frame.dataset.savedSrc = frame.src;
+  frame.src = 'about:blank';
+  frameStoppedByInactivity = true;
+  document.getElementById('inactiveOverlay').style.display = 'flex';
+  showToast('Плеер остановлен после длительной неактивности.');
+}
+
+function resumePlaybackAfterIdle() {
+  const frame = document.getElementById('embedFrame');
+  if (!frame) return;
+  frame.src = frame.dataset.savedSrc || (currentCh ? SOURCES[curSrc].url(currentCh.id) : 'about:blank');
+  frameStoppedByInactivity = false;
+  document.getElementById('inactiveOverlay').style.display = 'none';
+  resetInactivityTimer();
+}
+
 function setupResponsive() {
   const mobile = isMobile();
   document.getElementById('btnGrid').style.display   = mobile ? 'none' : 'flex';
   document.getElementById('btnPlayer').style.display = mobile ? 'none' : 'flex';
   document.getElementById('btnBurger').style.display = mobile ? 'flex' : 'none';
+  document.getElementById('btnSettings').style.display = 'flex';
 }
 
 async function loadAllChannels() {
@@ -735,7 +823,7 @@ function play(ch, source='unknown') {
 function renderPlayer(ch) {
   const c = document.getElementById('content');
   const embedUrl = SOURCES[curSrc].url(ch.id);
-  c.innerHTML = `<div class="player-view"><div class="embed-wrap"><iframe id="embedFrame" src="${esc(embedUrl)}" allowfullscreen allow="autoplay; fullscreen; encrypted-media; picture-in-picture"></iframe></div>
+  c.innerHTML = `<div class="player-view"><div class="embed-wrap"><iframe id="embedFrame" src="${esc(embedUrl)}" allowfullscreen allow="autoplay; fullscreen; encrypted-media; picture-in-picture"></iframe><div class="inactive-overlay" id="inactiveOverlay" style="display:none"><div class="inactive-card"><h4>Плеер остановлен из-за неактивности</h4><p>Вы были неактивны больше ${Number(appSettings.inactivityLimitMin || 50)} минут. Нажмите кнопку, чтобы продолжить просмотр.</p><button class="tap-primary" onclick="resumePlaybackAfterIdle()">Продолжить трансляцию</button></div></div></div>
       <div class="src-bar"><span class="src-lbl">Источник:</span>${SOURCES.map((s,i)=>`<button class="src-btn ${i===curSrc?'on':''}" onclick="switchSrc(${i})">${esc(s.label)}</button>`).join('')}</div>
       <div class="pib"><div class="pib-logo">${ch.thumb?`<img src="${esc(ch.thumb)}" onerror="this.style.display='none'">`:esc(ch.name.slice(0,3))}</div>
         <div class="pib-name">${esc(ch.name)}</div><div class="pib-owner">@${esc(ch.owner)}</div><div class="${ch.live?'pib-live':'pib-off'}">${ch.live?'LIVE':'OFF'}</div>
@@ -744,6 +832,52 @@ function renderPlayer(ch) {
       <div class="p-related"><div class="sec-lbl">Рекомендовано для вас</div><div class="ch-grid" id="relGrid"></div></div></div>`;
   document.getElementById('playerSubBtn').onclick = () => toggleSubscription(ch.id);
   renderRelated(ch);
+  resetInactivityTimer();
+}
+
+function renderSettings() {
+  const c = document.getElementById('content');
+  const inactivityOn = !!appSettings.stopOnInactivity;
+  c.innerHTML = `<div class="grid-wrap">
+    <div class="sec-lbl">⚙️ Настройки платформы</div>
+    <div class="settings-section">
+      <div class="settings-section-title">Плеер и рекомендации</div>
+      <div class="setting-row">
+        <div class="setting-label"><div class="sl-title">Останавливать iframe при неактивности</div><div class="sl-desc">Трансляция остановится, если не будет действий более заданного времени.</div></div>
+        <div class="toggle ${inactivityOn ? 'on' : ''}" id="idleToggle"></div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-label"><div class="sl-title">Лимит неактивности (минуты)</div><div class="sl-desc">По умолчанию 50 минут.</div></div>
+        <input id="idleMinutesInput" type="number" min="10" max="180" value="${Number(appSettings.inactivityLimitMin || 50)}" style="width:95px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 10px;">
+      </div>
+      <div class="setting-row">
+        <div class="setting-label"><div class="sl-title">Источник по умолчанию</div><div class="sl-desc">Используется при новом открытии плеера.</div></div>
+        <select id="sourceDefaultSelect" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 10px;">${SOURCES.map((s, i) => `<option value="${i}" ${Number(appSettings.defaultSource||0)===i?'selected':''}>${esc(s.label)}</option>`).join('')}</select>
+      </div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-title">Новый функционал: быстрые кнопки</div>
+      <div class="setting-row">
+        <button class="tap-secondary" onclick="curView='grid';renderGrid();">Открыть умную ленту</button>
+        <button class="tap-secondary" onclick="openBearOverlay(true)">Открыть Stars-маркет</button>
+      </div>
+    </div>
+  </div>`;
+  document.getElementById('idleToggle').onclick = () => {
+    appSettings.stopOnInactivity = !appSettings.stopOnInactivity;
+    saveSettings();
+    renderSettings();
+  };
+  document.getElementById('idleMinutesInput').onchange = (e) => {
+    const v = Math.max(10, Math.min(180, Number(e.target.value || 50)));
+    appSettings.inactivityLimitMin = v;
+    saveSettings();
+  };
+  document.getElementById('sourceDefaultSelect').onchange = (e) => {
+    appSettings.defaultSource = Number(e.target.value || 0);
+    curSrc = appSettings.defaultSource;
+    saveSettings();
+  };
 }
 
 function switchSrc(idx) {
@@ -774,8 +908,9 @@ function scoreChannel(ch) {
   const subBonus = subscriptions.has(ch.id) ? 8 : 0;
   const liveBonus = ch.live ? 1.5 : 0;
   const searchBoost = searchQ && ch.name.toLowerCase().includes(searchQ) ? 2 : 0;
-  const rewardBoost = rewardBoostUntil > Date.now() && subscriptions.has(ch.id) ? 4 : 0;
-  return typeScore + ownerScore + watchScore + subBonus + liveBonus + searchBoost + rewardBoost;
+  const rewardBoost = rewardBoostUntil > Date.now() && subscriptions.has(ch.id) ? 7 : 0;
+  const themedBonus = hasActiveEffect('uniqueTheme') ? 0.8 : 0;
+  return typeScore + ownerScore + watchScore + subBonus + liveBonus + searchBoost + rewardBoost + themedBonus;
 }
 
 function trackInterest(ch, source) {
@@ -822,6 +957,8 @@ function updateSeoForChannel(ch) {
   document.getElementById('ogTitle')?.setAttribute('content', document.title);
   document.getElementById('ogDescription')?.setAttribute('content', `Прямой эфир: ${ch.name}. Подпишитесь и получайте live-уведомления.`);
   document.getElementById('ogUrl')?.setAttribute('content', `${getBaseUrl()}${url}`);
+  document.getElementById('twitterTitle')?.setAttribute('content', document.title);
+  document.getElementById('twitterDescription')?.setAttribute('content', `Смотрите ${ch.name} онлайн на StreamLiveTV.`);
   updateStructuredData(ch);
 }
 
@@ -835,11 +972,14 @@ function updateStructuredData(ch) {
   const el = document.getElementById('seoStructuredData'); if (!el) return;
   el.textContent = JSON.stringify({
     '@context': 'https://schema.org',
-    '@type': 'TVSeries',
+    '@type': 'VideoObject',
     name: ch.name,
+    description: `Прямой эфир канала ${ch.name} в каталоге StreamLiveTV.`,
     url: `${getBaseUrl()}${channelPath(ch)}`,
     potentialAction: { '@type': 'WatchAction', target: SOURCES[0].url(ch.id) },
-    genre: ch.type === 'radio' ? 'Radio' : 'TV'
+    genre: ch.type === 'radio' ? 'Radio' : 'TV',
+    isLiveBroadcast: !!ch.live,
+    publisher: { '@type': 'Organization', name: 'NonStopStream' }
   });
 }
 
@@ -848,7 +988,7 @@ function maybeRequestNotificationPermission() {
 }
 
 function startNotificationPolling() {
-  setInterval(checkLiveNotifications, 45000);
+  setInterval(checkLiveNotifications, hasActiveEffect('proAlerts') ? 20000 : 45000);
   setTimeout(checkLiveNotifications, 8000);
 }
 
@@ -880,7 +1020,12 @@ function switchView(v) {
   curView = v;
   document.getElementById('btnGrid')?.classList.toggle('on', v==='grid');
   document.getElementById('btnPlayer')?.classList.toggle('on', v==='player');
-  if (v === 'grid') renderGrid(); else if (currentCh) renderPlayer(currentCh); else showNoCh();
+  document.getElementById('btnSettings')?.classList.toggle('on', v==='settings');
+  if (v !== 'player' && inactivityTimer) clearTimeout(inactivityTimer);
+  if (v === 'grid') renderGrid();
+  else if (v === 'settings') renderSettings();
+  else if (currentCh) renderPlayer(currentCh);
+  else showNoCh();
 }
 
 function mobileTab(tab) {
@@ -888,6 +1033,7 @@ function mobileTab(tab) {
   if (tab === 'grid') { document.getElementById('bnHome').classList.add('on'); curView='grid'; renderGrid(); }
   else if (tab === 'player') { document.getElementById('bnPlayer').classList.add('on'); curView='player'; currentCh ? renderPlayer(currentCh) : showNoCh(); }
   else if (tab === 'search') { document.getElementById('bnSearch').classList.add('on'); openMobileSearch(); }
+  else if (tab === 'settings') { document.getElementById('bnSettings').classList.add('on'); curView='settings'; renderSettings(); }
 }
 
 function openDrawer() { document.getElementById('drawer').classList.add('open'); document.getElementById('drawerOverlay').classList.add('open'); document.body.style.overflow='hidden'; }
@@ -901,6 +1047,8 @@ function renderSearchResults(q) {
 }
 
 function initStarsLoop() {
+  pruneRewardEffects();
+  renderRewardsCatalog();
   updateStarsHud();
   document.getElementById('starsRewardsBtn')?.addEventListener('click', () => openBearOverlay(true));
   document.getElementById('claimStarsBtn')?.addEventListener('click', claimStarsByTap);
@@ -929,23 +1077,62 @@ function claimStarsByTap() {
     closeBearOverlay();
     return;
   }
-  starsState.stars = Number(starsState.stars || 0) + 10;
+  const gain = hasActiveEffect('doubleClaim') ? 20 : 10;
+  starsState.stars = Number(starsState.stars || 0) + gain;
   starsState.nextClaimAt = now + (30 * 60 * 1000);
   localStorage.setItem(STORAGE_KEYS.stars, JSON.stringify(starsState));
-  showToast('Отлично! +10 Stars за тап 🧸⭐');
-  maybeAutoActivateReward();
+  showToast(`Отлично! +${gain} Stars за тап 🧸⭐`);
   updateStarsHud();
+  renderRewardsCatalog();
   closeBearOverlay();
 }
 
-function maybeAutoActivateReward() {
-  if (starsState.stars >= 50 && rewardBoostUntil < Date.now()) {
-    starsState.stars -= 50;
-    rewardBoostUntil = Date.now() + 24 * 60 * 60 * 1000;
-    localStorage.setItem(STORAGE_KEYS.stars, JSON.stringify(starsState));
+function renderRewardsCatalog() {
+  const wrap = document.getElementById('rewardsList');
+  if (!wrap) return;
+  wrap.innerHTML = `<b>Варианты обмена Stars:</b>` + REWARD_CATALOG.map(reward => {
+    const disabled = Number(starsState.stars || 0) < reward.cost;
+    return `<div class="reward-row"><span>• ${reward.cost} ⭐ — ${esc(reward.title)}</span><button data-reward="${reward.id}" ${disabled?'disabled':''}>Обменять</button></div>`;
+  }).join('');
+  wrap.querySelectorAll('button[data-reward]').forEach(btn => {
+    btn.onclick = () => redeemReward(btn.dataset.reward);
+  });
+}
+
+function redeemReward(rewardId) {
+  const reward = REWARD_CATALOG.find(r => r.id === rewardId);
+  if (!reward) return;
+  if (Number(starsState.stars || 0) < reward.cost) return showToast('Недостаточно Stars для обмена.');
+  starsState.stars -= reward.cost;
+  const payload = reward.apply();
+  if (payload.boostSubscriptions) {
+    rewardBoostUntil = Date.now() + reward.durationMs;
     localStorage.setItem(STORAGE_KEYS.rewardBoostUntil, String(rewardBoostUntil));
-    showToast('Активирован бонус: подписки в приоритете на 24 часа.');
   }
+  if (payload.uniqueTheme) rewardEffects.uniqueThemeUntil = Date.now() + reward.durationMs;
+  if (payload.proAlerts) rewardEffects.proAlertsUntil = Date.now() + reward.durationMs;
+  if (payload.doubleClaim) rewardEffects.doubleClaimUntil = Date.now() + reward.durationMs;
+  if (payload.raffleTickets) rewardEffects.raffleTickets = Number(rewardEffects.raffleTickets || 0) + payload.raffleTickets;
+  if (payload.addStars) starsState.stars += payload.addStars;
+  localStorage.setItem(STORAGE_KEYS.rewardEffects, JSON.stringify(rewardEffects));
+  localStorage.setItem(STORAGE_KEYS.stars, JSON.stringify(starsState));
+  applyActiveThemeReward();
+  showToast(`Награда активирована: ${reward.title}.`);
+  renderRewardsCatalog();
+  updateStarsHud();
+}
+
+function hasActiveEffect(effectKey) {
+  const until = Number(rewardEffects?.[`${effectKey}Until`] || 0);
+  return until > Date.now();
+}
+
+function pruneRewardEffects() {
+  ['uniqueThemeUntil','proAlertsUntil','doubleClaimUntil'].forEach(k => {
+    if (Number(rewardEffects[k] || 0) < Date.now()) delete rewardEffects[k];
+  });
+  localStorage.setItem(STORAGE_KEYS.rewardEffects, JSON.stringify(rewardEffects));
+  applyActiveThemeReward();
 }
 
 function updateStarsHud() {
@@ -957,7 +1144,9 @@ function updateStarsHud() {
   const min = String(Math.floor(left / 60000)).padStart(2, '0');
   const sec = String(Math.floor((left % 60000) / 1000)).padStart(2, '0');
   starsEl.textContent = `⭐ ${Number(starsState.stars || 0)} Stars`;
-  metaEl.textContent = left ? `До награды: ${min}:${sec}` : 'Доступно! Мишка ждёт тап 👆';
+  const tickets = Number(rewardEffects.raffleTickets || 0);
+  const extra = tickets ? ` · 🎟️ ${tickets}` : '';
+  metaEl.textContent = (left ? `До награды: ${min}:${sec}` : 'Доступно! Мишка ждёт тап 👆') + extra;
 }
 
 function showLoading() { document.getElementById('content').innerHTML = '<div class="state-screen"><div class="loader"></div><span>Загрузка каналов...</span></div>'; }
