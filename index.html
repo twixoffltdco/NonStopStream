@@ -433,6 +433,24 @@ body{font-family:'Manrope',sans-serif;background:var(--bg);color:var(--text);dis
 .inactive-card{max-width:420px;background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center}
 .inactive-card h4{font-size:16px;margin-bottom:6px}
 .inactive-card p{font-size:13px;color:var(--text2);line-height:1.45;margin-bottom:12px}
+@media(max-width:768px){
+  .header{gap:8px;padding-inline:10px}
+  .logo{font-size:20px;letter-spacing:1px}
+  .tg-banner-left,.tg-badge{display:none}
+  .stars-hud{
+    left:10px;
+    right:10px;
+    bottom:calc(66px + var(--safe-bottom));
+    width:auto;
+    max-width:calc(100vw - 20px);
+    justify-content:space-between;
+    gap:8px;
+    padding:8px 10px;
+  }
+  .stars-count{font-size:12px}
+  .stars-meta{font-size:10px}
+  .stars-btn{font-size:10px;padding:5px 7px;white-space:nowrap}
+}
 </style>
 </head>
 <body>
@@ -566,7 +584,6 @@ body{font-family:'Manrope',sans-serif;background:var(--bg);color:var(--text);dis
 <div class="toast-wrap" id="toastWrap"></div>
 <script type="application/ld+json" id="seoStructuredData">{"@context":"https://schema.org","@type":"WebSite","name":"StreamLiveTV","url":"/public/streamlivetv/","potentialAction":{"@type":"SearchAction","target":"/public/streamlivetv/?q={search_term_string}","query-input":"required name=search_term_string"}}</script>
 <script src="https://vjs.zencdn.net/8.23.4/video.min.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/OinkTechLtd/cdnplayerjs@main/cdnplayer.min.js"></script>
 <script>
 const API_URL = 'https://aqeleulwobgamdffkfri.supabase.co/functions/v1/public-channels';
 const IPTV_ORG_CHANNELS_URL = 'https://iptv-org.github.io/api/channels.json';
@@ -578,8 +595,17 @@ const STREAMLIVETV_SOURCES = [
   { id:'flow', label:'Flow', url: id => `https://stlivetv.netlify.app/embed/${id}` }
 ];
 const IPTV_ORG_SOURCES = [
-  { id:'embess', label:'Embess', mode:'videojs' },
-  { id:'ackadar', label:'Ackadar', mode:'ackadar' }
+  { id:'direct', label:'IPTV-org', mode:'videojs' },
+  {
+    id:'mirror',
+    label:'Mirror Auto',
+    mode:'iframePool',
+    urls: [
+      'https://bba80dtl97phe28ar8rg.containers.yandexcloud.net/',
+      'https://cdnplayerpotok.onreza.app/',
+      'https://cdnplayerpotok.vercel.app/'
+    ]
+  }
 ];
 
 const STORAGE_KEYS = {
@@ -620,6 +646,8 @@ let appSettings = JSON.parse(localStorage.getItem(STORAGE_KEYS.settings) || '{"s
 let inactivityTimer = null;
 let frameStoppedByInactivity = false;
 let activeVideoJsPlayer = null;
+let iptvMirrorTry = 0;
+let iptvAutoSwitchLock = false;
 const isMobile = () => window.innerWidth <= 768;
 const UI_THEMES = {
   default: { label: 'Default Red', accent: '#ff4040', bg: '#080c14', bg2: '#0d1220', bg3: '#141926', bg4: '#1a2133', border: '#1e2a40' },
@@ -823,6 +851,7 @@ function processIptvOrgChannels(payload) {
   const channels = Array.isArray(payload?.channels) ? payload.channels : [];
   const streams = Array.isArray(payload?.streams) ? payload.streams : [];
   if (!channels.length || !streams.length) return;
+  const IPTV_MAX_CHANNELS = 900;
   const streamByChannel = new Map();
   streams.forEach((s) => {
     if (!s.channel || !s.url) return;
@@ -830,6 +859,7 @@ function processIptvOrgChannels(payload) {
   });
   const fresh = channels
     .filter((ch) => streamByChannel.has(ch.id))
+    .slice(0, IPTV_MAX_CHANNELS)
     .filter((ch) => {
       const id = `iptv-org:${ch.id}`;
       if (seenIds.has(id)) return false;
@@ -932,9 +962,10 @@ function renderPlayer(ch) {
   const channelSources = getSourcesForChannel(ch);
   normalizeSourceIndex(ch);
   const srcMeta = channelSources[curSrc];
+  iptvMirrorTry = 0;
   const playbackMarkup = ch.catalog === 'iptv-org'
-    ? (srcMeta.mode === 'ackadar'
-      ? `<div id="ackadarPlayer"></div>`
+    ? (srcMeta.mode === 'iframePool'
+      ? `<iframe id="iptvMirrorFrame" src="about:blank" allowfullscreen allow="autoplay; fullscreen; encrypted-media; picture-in-picture"></iframe>`
       : `<video id="iptvVideo" class="video-js vjs-default-skin" controls playsinline preload="auto"></video>`)
     : `<iframe id="embedFrame" src="${esc(srcMeta.url(ch.id))}" allowfullscreen allow="autoplay; fullscreen; encrypted-media; picture-in-picture"></iframe>`;
   c.innerHTML = `<div class="player-view"><div class="embed-wrap">${playbackMarkup}<div class="inactive-overlay" id="inactiveOverlay" style="display:none"><div class="inactive-card"><h4>Плеер остановлен из-за неактивности</h4><p>Вы были неактивны больше ${Number(appSettings.inactivityLimitMin || 50)} минут. Нажмите кнопку, чтобы продолжить просмотр.</p><button class="tap-primary" onclick="resumePlaybackAfterIdle()">Продолжить трансляцию</button></div></div></div>
@@ -1024,9 +1055,8 @@ function destroyIptvPlayers() {
 function mountIptvPlayer(ch, srcMeta) {
   destroyIptvPlayers();
   if (ch.catalog !== 'iptv-org' || !ch.streamUrl) return;
-  if (srcMeta.mode === 'ackadar' && window.CdnPlayerjs) {
-    const target = document.getElementById('ackadarPlayer');
-    if (target) window.CdnPlayerjs?.setup?.('ackadarPlayer', { file: ch.streamUrl, autoplay: true });
+  if (srcMeta.mode === 'iframePool') {
+    mountIptvMirror(ch, srcMeta);
     return;
   }
   const videoEl = document.getElementById('iptvVideo');
@@ -1034,11 +1064,47 @@ function mountIptvPlayer(ch, srcMeta) {
   if (window.videojs) {
     activeVideoJsPlayer = window.videojs(videoEl, { autoplay: true, controls: true, fluid: true });
     activeVideoJsPlayer.src({ src: ch.streamUrl, type: 'application/x-mpegURL' });
+    activeVideoJsPlayer.on('error', () => autoSwitchIptvSource());
     activeVideoJsPlayer.play().catch(()=>{});
   } else {
     videoEl.src = ch.streamUrl;
+    videoEl.addEventListener('error', autoSwitchIptvSource, { once: true });
     videoEl.play().catch(()=>{});
   }
+}
+
+function mountIptvMirror(ch, srcMeta) {
+  const frame = document.getElementById('iptvMirrorFrame');
+  if (!frame) return;
+  const mirrors = Array.isArray(srcMeta.urls) ? srcMeta.urls : [];
+  if (!mirrors.length) return;
+  const mountMirrorAt = (idx) => {
+    iptvMirrorTry = idx % mirrors.length;
+    const base = String(mirrors[iptvMirrorTry] || '').replace(/\/+$/, '');
+    const stream = encodeURIComponent(ch.streamUrl);
+    frame.src = `${base}/?url=${stream}`;
+    frame.onerror = () => {
+      const next = iptvMirrorTry + 1;
+      if (next < mirrors.length) {
+        showToast(`Mirror недоступен, пробую узел ${next + 1}/${mirrors.length}.`);
+        mountMirrorAt(next);
+      } else {
+        autoSwitchIptvSource();
+      }
+    };
+  };
+  mountMirrorAt(iptvMirrorTry);
+}
+
+function autoSwitchIptvSource() {
+  if (iptvAutoSwitchLock || !currentCh || currentCh.catalog !== 'iptv-org') return;
+  const list = getSourcesForChannel(currentCh);
+  if (list.length < 2) return;
+  iptvAutoSwitchLock = true;
+  const next = (curSrc + 1) % list.length;
+  showToast('Поток недоступен. Переключаю на резервный источник.');
+  switchSrc(next);
+  setTimeout(() => { iptvAutoSwitchLock = false; }, 800);
 }
 
 function renderRelated(current) {
