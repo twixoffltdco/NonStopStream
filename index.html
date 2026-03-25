@@ -29,6 +29,7 @@
 <meta name="keywords" content="онлайн тв, прямой эфир, live tv, streamlivetv, nonstopstream, радиостанции онлайн, телеканалы"/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://vjs.zencdn.net/8.23.4/video-js.css" rel="stylesheet">
 <style>
 :root {
   --bg:#080c14; --bg2:#0d1220; --bg3:#141926; --bg4:#1a2133;
@@ -145,7 +146,7 @@ body{
 .player-view{display:flex;flex-direction:column;height:100%;overflow:hidden}
 .embed-wrap{width:100%;position:relative;background:#000;flex-shrink:0}
 .embed-wrap::after{content:'';display:block;padding-bottom:56.25%}
-.embed-wrap iframe{position:absolute;inset:0;width:100%;height:100%;border:none}
+.embed-wrap iframe,.embed-wrap .video-js,.embed-wrap #ackadarPlayer{position:absolute;inset:0;width:100%;height:100%;border:none}
 
 .src-bar{
   display:flex;align-items:center;gap:6px;padding:7px 14px;
@@ -317,7 +318,7 @@ body{font-family:'Manrope',sans-serif;background:var(--bg);color:var(--text);dis
 .player-view{display:flex;flex-direction:column;height:100%;overflow:hidden}
 .embed-wrap{width:100%;position:relative;background:#000;flex-shrink:0}
 .embed-wrap::after{content:'';display:block;padding-bottom:56.25%}
-.embed-wrap iframe{position:absolute;inset:0;width:100%;height:100%;border:none}
+.embed-wrap iframe,.embed-wrap .video-js,.embed-wrap #ackadarPlayer{position:absolute;inset:0;width:100%;height:100%;border:none}
 .src-bar{display:flex;align-items:center;gap:6px;padding:7px 14px;background:var(--bg2);border-bottom:1px solid var(--border);overflow-x:auto;flex-shrink:0}
 .src-btn{padding:5px 13px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--bg3);color:var(--text2);white-space:nowrap}
 .src-btn:hover{background:var(--bg4);color:var(--text)}
@@ -564,13 +565,21 @@ body{font-family:'Manrope',sans-serif;background:var(--bg);color:var(--text);dis
 </div>
 <div class="toast-wrap" id="toastWrap"></div>
 <script type="application/ld+json" id="seoStructuredData">{"@context":"https://schema.org","@type":"WebSite","name":"StreamLiveTV","url":"/public/streamlivetv/","potentialAction":{"@type":"SearchAction","target":"/public/streamlivetv/?q={search_term_string}","query-input":"required name=search_term_string"}}</script>
+<script src="https://vjs.zencdn.net/8.23.4/video.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/OinkTechLtd/cdnplayerjs@main/cdnplayer.min.js"></script>
 <script>
 const API_URL = 'https://aqeleulwobgamdffkfri.supabase.co/functions/v1/public-channels';
+const IPTV_ORG_CHANNELS_URL = 'https://iptv-org.github.io/api/channels.json';
+const IPTV_ORG_STREAMS_URL = 'https://iptv-org.github.io/api/streams.json';
 const ALLOWED = ['oinktech', 'twixoff', 'тв каналы', 'tv каналы', 'adrealine_ukraine'];
-const SOURCES = [
+const STREAMLIVETV_SOURCES = [
   { id:'native',  label:'StreamLiveTV',  url: id => `https://bbacesemc33e7hd47kfq.containers.yandexcloud.net/embed/${id}` },
-  { id:'embess',  label:'Embess Studio', url: id => `https://embesslivestudio.lovable.app/player?channel=${id}` },
+  { id:'embess',  label:'Embess', url: id => `https://embesslivestudio.lovable.app/player?channel=${id}` },
   { id:'flow', label:'Flow', url: id => `https://stlivetv.netlify.app/embed/${id}` }
+];
+const IPTV_ORG_SOURCES = [
+  { id:'embess', label:'Embess', mode:'videojs' },
+  { id:'ackadar', label:'Ackadar', mode:'ackadar' }
 ];
 
 const STORAGE_KEYS = {
@@ -610,6 +619,7 @@ let rewardEffects = JSON.parse(localStorage.getItem(STORAGE_KEYS.rewardEffects) 
 let appSettings = JSON.parse(localStorage.getItem(STORAGE_KEYS.settings) || '{"stopOnInactivity":true,"inactivityLimitMin":50,"defaultSource":0,"uiTheme":"default"}');
 let inactivityTimer = null;
 let frameStoppedByInactivity = false;
+let activeVideoJsPlayer = null;
 const isMobile = () => window.innerWidth <= 768;
 const UI_THEMES = {
   default: { label: 'Default Red', accent: '#ff4040', bg: '#080c14', bg2: '#0d1220', bg3: '#141926', bg4: '#1a2133', border: '#1e2a40' },
@@ -634,12 +644,12 @@ window.onload = () => {
 
 function initSeoDefaults() {
   const rootUrl = `${getBaseUrl()}/public/streamlivetv/`;
-  const path = window.location.pathname;
+  const route = getRouteRequest();
   document.getElementById('canonicalLink')?.setAttribute('href', rootUrl);
   document.getElementById('ogUrl')?.setAttribute('content', rootUrl);
   setMeta('description', 'NonStopStream / StreamLiveTV — каталог прямых ТВ и радио эфиров, подписки, рекомендации и live-уведомления.');
-  if (/\/public\/streamlivetv\/[^/]+/i.test(path)) {
-    const slug = path.split('/').filter(Boolean).pop();
+  if (route.channel) {
+    const slug = route.channel;
     const channelName = deSlugify(slug);
     document.title = `${channelName} — смотреть онлайн прямой эфир | NonStopStream`;
     setMeta('description', `Смотрите ${channelName} онлайн в прямом эфире на NonStopStream. Подписки, умные рекомендации и уведомления о live.`);
@@ -648,8 +658,8 @@ function initSeoDefaults() {
     document.getElementById('ogDescription')?.setAttribute('content', `Прямой эфир канала ${channelName} в каталоге NonStopStream.`);
     document.getElementById('twitterTitle')?.setAttribute('content', document.title);
     document.getElementById('twitterDescription')?.setAttribute('content', `Онлайн трансляция ${channelName} на StreamLiveTV.`);
-    document.getElementById('canonicalLink')?.setAttribute('href', `${getBaseUrl()}${path}`);
-    document.getElementById('ogUrl')?.setAttribute('content', `${getBaseUrl()}${path}`);
+    document.getElementById('canonicalLink')?.setAttribute('href', window.location.href);
+    document.getElementById('ogUrl')?.setAttribute('content', window.location.href);
   }
   const seo = document.getElementById('seoStructuredData');
   if (seo) seo.textContent = JSON.stringify({
@@ -674,6 +684,17 @@ function initSettings() {
   const activityEvents = ['mousemove','mousedown','keydown','touchstart','scroll'];
   activityEvents.forEach(evt => window.addEventListener(evt, resetInactivityTimer, { passive: true }));
   applyActiveThemeReward();
+}
+
+function getSourcesForChannel(ch = currentCh) {
+  return ch?.catalog === 'iptv-org' ? IPTV_ORG_SOURCES : STREAMLIVETV_SOURCES;
+}
+
+function normalizeSourceIndex(ch = currentCh) {
+  const list = getSourcesForChannel(ch);
+  if (!list.length) return 0;
+  if (curSrc >= list.length) curSrc = 0;
+  return curSrc;
 }
 
 function saveSettings() {
@@ -701,10 +722,18 @@ function resetInactivityTimer() {
 }
 
 function stopPlaybackForInactivity() {
+  if (curView !== 'player') return;
   const frame = document.getElementById('embedFrame');
-  if (!frame || curView !== 'player') return;
-  frame.dataset.savedSrc = frame.src;
-  frame.src = 'about:blank';
+  const videoEl = document.getElementById('iptvVideo');
+  if (frame) {
+    frame.dataset.savedSrc = frame.src;
+    frame.src = 'about:blank';
+  }
+  if (videoEl) {
+    videoEl.dataset.savedSrc = videoEl.currentSrc || currentCh?.streamUrl || '';
+    if (activeVideoJsPlayer) activeVideoJsPlayer.pause();
+    else videoEl.pause();
+  }
   frameStoppedByInactivity = true;
   document.getElementById('inactiveOverlay').style.display = 'flex';
   showToast('Плеер остановлен после длительной неактивности.');
@@ -712,8 +741,16 @@ function stopPlaybackForInactivity() {
 
 function resumePlaybackAfterIdle() {
   const frame = document.getElementById('embedFrame');
-  if (!frame) return;
-  frame.src = frame.dataset.savedSrc || (currentCh ? SOURCES[curSrc].url(currentCh.id) : 'about:blank');
+  if (frame) frame.src = frame.dataset.savedSrc || (currentCh ? getSourcesForChannel(currentCh)[normalizeSourceIndex(currentCh)].url(currentCh.id) : 'about:blank');
+  const videoEl = document.getElementById('iptvVideo');
+  if (videoEl) {
+    const restoreUrl = videoEl.dataset.savedSrc || currentCh?.streamUrl;
+    if (restoreUrl) {
+      videoEl.src = restoreUrl;
+      if (activeVideoJsPlayer) activeVideoJsPlayer.src({ src: restoreUrl, type: 'application/x-mpegURL' });
+      videoEl.play().catch(()=>{});
+    }
+  }
   frameStoppedByInactivity = false;
   document.getElementById('inactiveOverlay').style.display = 'none';
   resetInactivityTimer();
@@ -729,10 +766,13 @@ function setupResponsive() {
 
 async function loadAllChannels() {
   try {
-    const r = await fetch(API_URL, { method:'GET', headers:{'Accept':'application/json'} });
-    const json = await r.json();
-    processChannels(extractList(json));
-    const tp = json.pagination?.total_pages || 1;
+    const [streamInit, iptvInit] = await Promise.all([
+      fetch(API_URL, { method:'GET', headers:{'Accept':'application/json'} }).then(r => r.json()),
+      loadIptvOrgChannels()
+    ]);
+    processChannels(extractList(streamInit));
+    processIptvOrgChannels(iptvInit);
+    const tp = streamInit.pagination?.total_pages || 1;
     const pages = Array.from({length: tp - 1}, (_, i) => i + 2);
     for (let i = 0; i < pages.length; i += 3) {
       await Promise.all(pages.slice(i, i + 3).map(p => fetch(`${API_URL}?page=${p}&limit=50`).then(r => r.json()).then(j => processChannels(extractList(j))).catch(()=>{})));
@@ -742,6 +782,14 @@ async function loadAllChannels() {
   } catch(e) {
     if (allCh.length === 0) showError('Не удалось загрузить каналы: ' + e.message);
   }
+}
+
+async function loadIptvOrgChannels() {
+  const [channels, streams] = await Promise.all([
+    fetch(IPTV_ORG_CHANNELS_URL).then(r => r.json()),
+    fetch(IPTV_ORG_STREAMS_URL).then(r => r.json())
+  ]);
+  return { channels, streams };
 }
 
 function extractList(json) {
@@ -763,6 +811,40 @@ function processChannels(list) {
       type: ch.channel_type || ch.type || 'tv',
       live: !!(ch.is_live || ch.live),
       owner: (typeof ch.owner === 'object' ? ch.owner?.username : ch.owner) || '',
+      catalog: 'streamlivetv'
+    }));
+  if (!fresh.length) return;
+  allCh.push(...fresh);
+  if (!currentCh) currentCh = allCh[0];
+  applyFilters();
+}
+
+function processIptvOrgChannels(payload) {
+  const channels = Array.isArray(payload?.channels) ? payload.channels : [];
+  const streams = Array.isArray(payload?.streams) ? payload.streams : [];
+  if (!channels.length || !streams.length) return;
+  const streamByChannel = new Map();
+  streams.forEach((s) => {
+    if (!s.channel || !s.url) return;
+    if (!streamByChannel.has(s.channel)) streamByChannel.set(s.channel, s.url);
+  });
+  const fresh = channels
+    .filter((ch) => streamByChannel.has(ch.id))
+    .filter((ch) => {
+      const id = `iptv-org:${ch.id}`;
+      if (seenIds.has(id)) return false;
+      seenIds.add(id);
+      return true;
+    })
+    .map((ch) => ({
+      id: `iptv-org:${ch.id}`,
+      streamUrl: streamByChannel.get(ch.id),
+      name: (ch.name || '').trim() || 'Без названия',
+      thumb: ch.logo || '',
+      type: ch.is_nsfw ? 'tv' : ((ch.categories || []).includes('radio') ? 'radio' : 'tv'),
+      live: true,
+      owner: 'iptv-org',
+      catalog: 'iptv-org'
     }));
   if (!fresh.length) return;
   allCh.push(...fresh);
@@ -847,9 +929,16 @@ function play(ch, source='unknown') {
 
 function renderPlayer(ch) {
   const c = document.getElementById('content');
-  const embedUrl = SOURCES[curSrc].url(ch.id);
-  c.innerHTML = `<div class="player-view"><div class="embed-wrap"><iframe id="embedFrame" src="${esc(embedUrl)}" allowfullscreen allow="autoplay; fullscreen; encrypted-media; picture-in-picture"></iframe><div class="inactive-overlay" id="inactiveOverlay" style="display:none"><div class="inactive-card"><h4>Плеер остановлен из-за неактивности</h4><p>Вы были неактивны больше ${Number(appSettings.inactivityLimitMin || 50)} минут. Нажмите кнопку, чтобы продолжить просмотр.</p><button class="tap-primary" onclick="resumePlaybackAfterIdle()">Продолжить трансляцию</button></div></div></div>
-      <div class="src-bar"><span class="src-lbl">Источник:</span>${SOURCES.map((s,i)=>`<button class="src-btn ${i===curSrc?'on':''}" onclick="switchSrc(${i})">${esc(s.label)}</button>`).join('')}</div>
+  const channelSources = getSourcesForChannel(ch);
+  normalizeSourceIndex(ch);
+  const srcMeta = channelSources[curSrc];
+  const playbackMarkup = ch.catalog === 'iptv-org'
+    ? (srcMeta.mode === 'ackadar'
+      ? `<div id="ackadarPlayer"></div>`
+      : `<video id="iptvVideo" class="video-js vjs-default-skin" controls playsinline preload="auto"></video>`)
+    : `<iframe id="embedFrame" src="${esc(srcMeta.url(ch.id))}" allowfullscreen allow="autoplay; fullscreen; encrypted-media; picture-in-picture"></iframe>`;
+  c.innerHTML = `<div class="player-view"><div class="embed-wrap">${playbackMarkup}<div class="inactive-overlay" id="inactiveOverlay" style="display:none"><div class="inactive-card"><h4>Плеер остановлен из-за неактивности</h4><p>Вы были неактивны больше ${Number(appSettings.inactivityLimitMin || 50)} минут. Нажмите кнопку, чтобы продолжить просмотр.</p><button class="tap-primary" onclick="resumePlaybackAfterIdle()">Продолжить трансляцию</button></div></div></div>
+      <div class="src-bar"><span class="src-lbl">Источник:</span>${channelSources.map((s,i)=>`<button class="src-btn ${i===curSrc?'on':''}" onclick="switchSrc(${i})">${esc(s.label)}</button>`).join('')}</div>
       <div class="pib"><div class="pib-logo">${ch.thumb?`<img src="${esc(ch.thumb)}" onerror="this.style.display='none'">`:esc(ch.name.slice(0,3))}</div>
         <div class="pib-name">${esc(ch.name)}</div><div class="pib-owner">@${esc(ch.owner)}</div><div class="${ch.live?'pib-live':'pib-off'}">${ch.live?'LIVE':'OFF'}</div>
         <button class="sub-btn ${subscriptions.has(ch.id)?'on':''}" id="playerSubBtn">${subscriptions.has(ch.id)?'Вы подписаны':'Подписаться'}</button>
@@ -857,6 +946,7 @@ function renderPlayer(ch) {
       <div class="p-related"><div class="sec-lbl">Рекомендовано для вас</div><div class="ch-grid" id="relGrid"></div></div></div>`;
   document.getElementById('playerSubBtn').onclick = () => toggleSubscription(ch.id);
   renderRelated(ch);
+  mountIptvPlayer(ch, srcMeta);
   resetInactivityTimer();
 }
 
@@ -878,7 +968,7 @@ function renderSettings() {
       </div>
       <div class="setting-row">
         <div class="setting-label"><div class="sl-title">Источник по умолчанию</div><div class="sl-desc">Используется при новом открытии плеера.</div></div>
-        <select id="sourceDefaultSelect" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 10px;">${SOURCES.map((s, i) => `<option value="${i}" ${Number(appSettings.defaultSource||0)===i?'selected':''}>${esc(s.label)}</option>`).join('')}</select>
+        <select id="sourceDefaultSelect" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 10px;">${STREAMLIVETV_SOURCES.map((s, i) => `<option value="${i}" ${Number(appSettings.defaultSource||0)===i?'selected':''}>${esc(s.label)}</option>`).join('')}</select>
       </div>
     </div>
     <div class="settings-section">
@@ -920,9 +1010,35 @@ function renderSettings() {
 
 function switchSrc(idx) {
   curSrc = idx;
-  const frame = document.getElementById('embedFrame');
-  if (frame && currentCh) frame.src = SOURCES[idx].url(currentCh.id);
+  if (currentCh) renderPlayer(currentCh);
   document.querySelectorAll('.src-btn').forEach((b,i)=>b.classList.toggle('on', i===idx));
+}
+
+function destroyIptvPlayers() {
+  if (activeVideoJsPlayer) {
+    activeVideoJsPlayer.dispose();
+    activeVideoJsPlayer = null;
+  }
+}
+
+function mountIptvPlayer(ch, srcMeta) {
+  destroyIptvPlayers();
+  if (ch.catalog !== 'iptv-org' || !ch.streamUrl) return;
+  if (srcMeta.mode === 'ackadar' && window.CdnPlayerjs) {
+    const target = document.getElementById('ackadarPlayer');
+    if (target) window.CdnPlayerjs?.setup?.('ackadarPlayer', { file: ch.streamUrl, autoplay: true });
+    return;
+  }
+  const videoEl = document.getElementById('iptvVideo');
+  if (!videoEl) return;
+  if (window.videojs) {
+    activeVideoJsPlayer = window.videojs(videoEl, { autoplay: true, controls: true, fluid: true });
+    activeVideoJsPlayer.src({ src: ch.streamUrl, type: 'application/x-mpegURL' });
+    activeVideoJsPlayer.play().catch(()=>{});
+  } else {
+    videoEl.src = ch.streamUrl;
+    videoEl.play().catch(()=>{});
+  }
 }
 
 function renderRelated(current) {
@@ -972,7 +1088,11 @@ function toggleSubscription(id) {
 }
 
 function getBaseUrl() { return `${window.location.protocol}//${window.location.host}`; }
-function channelPath(ch) { return `/public/streamlivetv/${slugify(ch.name)}`; }
+function channelPath(ch) {
+  const slug = slugify(ch.name);
+  const params = new URLSearchParams({ source: ch.catalog || 'streamlivetv', channel: slug });
+  return `/public/streamlivetv/?${params.toString()}`;
+}
 function slugify(text) {
   const map = { 'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'e','ж':'zh','з':'z','и':'i','й':'y','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u','ф':'f','х':'h','ц':'c','ч':'ch','ш':'sh','щ':'sch','ы':'y','э':'e','ю':'yu','я':'ya','ь':'','ъ':'' };
   return text.toLowerCase().split('').map(ch => map[ch] ?? ch).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80);
@@ -986,22 +1106,38 @@ function deSlugify(slug) {
 }
 
 function handleRouteByPath() {
-  const m = window.location.pathname.match(/\/public\/streamlivetv\/([^/]+)/i);
-  if (!m || !allCh.length) return;
-  const slug = m[1];
-  const found = allCh.find(ch => slugify(ch.name) === slug);
+  const { channel: slug, source } = getRouteRequest();
+  if (!slug || !allCh.length) return;
+  const found = allCh.find(ch => slugify(ch.name) === slug && (!source || ch.catalog === source));
   if (found) { play(found, 'route'); switchView('player'); }
+}
+
+function getRouteRequest() {
+  const params = new URLSearchParams(window.location.search);
+  let channel = params.get('channel');
+  let source = params.get('source');
+  if (!channel) {
+    const legacy = window.location.pathname.match(/\/public\/streamlivetv\/([^/]+)/i);
+    if (legacy?.[1]) {
+      channel = legacy[1];
+      source = 'streamlivetv';
+      const newUrl = `/public/streamlivetv/?source=${encodeURIComponent(source)}&channel=${encodeURIComponent(channel)}`;
+      history.replaceState({}, '', newUrl);
+    }
+  }
+  return { channel, source };
 }
 
 function updateSeoForChannel(ch) {
   const url = channelPath(ch);
-  if (window.location.pathname !== url) history.replaceState({channelId: ch.id}, '', url);
+  const target = `${getBaseUrl()}${url}`;
+  if (window.location.href !== target) history.replaceState({channelId: ch.id}, '', url);
   document.title = `${ch.name} — смотреть прямой эфир | StreamLiveTV`;
   setMeta('description', `Смотрите ${ch.name} онлайн в прямом эфире. Живой канал ${ch.type==='radio'?'радио':'ТВ'}, подборки и рекомендации StreamLiveTV.`);
-  document.getElementById('canonicalLink')?.setAttribute('href', `${getBaseUrl()}${url}`);
+  document.getElementById('canonicalLink')?.setAttribute('href', target);
   document.getElementById('ogTitle')?.setAttribute('content', document.title);
   document.getElementById('ogDescription')?.setAttribute('content', `Прямой эфир: ${ch.name}. Подпишитесь и получайте live-уведомления.`);
-  document.getElementById('ogUrl')?.setAttribute('content', `${getBaseUrl()}${url}`);
+  document.getElementById('ogUrl')?.setAttribute('content', target);
   document.getElementById('twitterTitle')?.setAttribute('content', document.title);
   document.getElementById('twitterDescription')?.setAttribute('content', `Смотрите ${ch.name} онлайн на StreamLiveTV.`);
   updateStructuredData(ch);
@@ -1074,6 +1210,7 @@ function switchView(v) {
   document.getElementById('btnPlayer')?.classList.toggle('on', v==='player');
   document.getElementById('btnSettings')?.classList.toggle('on', v==='settings');
   if (v !== 'player' && inactivityTimer) clearTimeout(inactivityTimer);
+  if (v !== 'player') destroyIptvPlayers();
   if (v === 'grid') renderGrid();
   else if (v === 'settings') renderSettings();
   else if (currentCh) renderPlayer(currentCh);
