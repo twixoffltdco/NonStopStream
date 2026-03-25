@@ -13,6 +13,15 @@
 <meta name="apple-mobile-web-app-title" content="StreamTV">
 <meta name="theme-color" content="#080c14">
 <title>StreamTV</title>
+<meta name="description" content="StreamLiveTV — онлайн-каталог прямых каналов с SEO-страницами, подписками, рекомендациями и live-уведомлениями."/>
+<meta name="robots" content="index,follow,max-image-preview:large"/>
+<link rel="canonical" id="canonicalLink" href="/public/streamlivetv/"/>
+<meta property="og:type" content="website"/>
+<meta property="og:site_name" content="StreamLiveTV"/>
+<meta property="og:title" id="ogTitle" content="StreamLiveTV — прямые эфиры"/>
+<meta property="og:description" id="ogDescription" content="Смотрите live-каналы, подписывайтесь и получайте персональные рекомендации."/>
+<meta property="og:url" id="ogUrl" content="/public/streamlivetv/"/>
+<meta name="twitter:card" content="summary_large_image"/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -384,6 +393,15 @@ body{font-family:'Manrope',sans-serif;background:var(--bg);color:var(--text);dis
   .tg-banner{flex-direction:column;text-align:center}
   .tg-banner-left{justify-content:center}
 }
+
+.sub-btn{background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:6px 12px;color:var(--text2);font-size:11px;font-weight:700;cursor:pointer;transition:all .2s}
+.sub-btn:hover{border-color:var(--accent);color:var(--text)}
+.sub-btn.on{background:rgba(255,64,64,.22);border-color:var(--accent);color:#fff}
+.sub-btn.small{position:absolute;left:6px;bottom:6px;padding:4px 8px;font-size:9px;z-index:5}
+.rec-chip{font-size:9px;background:rgba(255,64,64,.18);color:#ff8f8f;border:1px solid rgba(255,64,64,.4);padding:2px 6px;border-radius:30px;margin-left:6px}
+.toast-wrap{position:fixed;right:14px;bottom:calc(76px + var(--safe-bottom));display:flex;flex-direction:column;gap:8px;z-index:1200}
+.toast{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:10px 12px;min-width:240px;max-width:320px;box-shadow:0 10px 25px rgba(0,0,0,.35);font-size:12px}
+.toast b{color:var(--text)}
 </style>
 </head>
 <body>
@@ -493,139 +511,102 @@ body{font-family:'Manrope',sans-serif;background:var(--bg);color:var(--text);dis
   <div class="ch-grid" id="mobileSearchResults" style="overflow-y:auto;max-height:calc(100vh - 100px)"></div>
 </div>
 
+<div class="toast-wrap" id="toastWrap"></div>
+<script type="application/ld+json" id="seoStructuredData">{"@context":"https://schema.org","@type":"WebSite","name":"StreamLiveTV","url":"/public/streamlivetv/","potentialAction":{"@type":"SearchAction","target":"/public/streamlivetv/?q={search_term_string}","query-input":"required name=search_term_string"}}</script>
 <script>
-// ══════════════════════════════════════════════
-//  CONFIG
-// ══════════════════════════════════════════════
 const API_URL = 'https://aqeleulwobgamdffkfri.supabase.co/functions/v1/public-channels';
-const ALLOWED = ['oinktech', 'twixoff', 'ТВ КАНАЛЫ', 'Adrealine_Ukraine'];
+const ALLOWED = ['oinktech', 'twixoff', 'тв каналы', 'tv каналы', 'adrealine_ukraine'];
 const SOURCES = [
-  { id:'embess',  label:'Embess Studio', url: id => `https://embesslivestudio.lovable.app/player?channel=${id}` },
   { id:'native',  label:'StreamLiveTV',  url: id => `https://bbacesemc33e7hd47kfq.containers.yandexcloud.net/embed/${id}` },
-  { id:'embess-new', label:'Embess', url: id => `https://embesslivestudio.vercel.app/embed/${id}` },
-  { id:'embess-proxy', label:'Proxy Embess', url: id => `https://cors-anywhere.herokuapp.com/embesslivestudio.vercel.app/embed/${id}` },
-  { id:'flow', label:'Flow', url: id => `https://stlivetv.netlify.app/embed/${id}` },
-  { id:'Оригинал', label:'Оригинал (Не рекомендуется с 1 апреля 2026 закрытие данного источника)', url: id => `https://livestudio-creator.lovable.app/embed/${id}` },
-  { id:'Оригинал2', label:'Оригинал', url: id => `https://bbacesemc33e7hd47kfq.containers.yandexcloud.net/embed/${id}` },
-  { id:'namy.sh', label:'namy.sh', url: id => `https://livetv.base44.app/embed?url=https://embesslivestudio.vercel.app/embed/${id}` },
+  { id:'embess',  label:'Embess Studio', url: id => `https://embesslivestudio.lovable.app/player?channel=${id}` },
+  { id:'flow', label:'Flow', url: id => `https://stlivetv.netlify.app/embed/${id}` }
 ];
 
-// ══════════════════════════════════════════════
-//  STATE
-// ══════════════════════════════════════════════
+const STORAGE_KEYS = {
+  subs: 'nss_subscriptions',
+  profile: 'nss_interest_profile',
+  notifications: 'nss_live_notifications'
+};
+
 let allCh = [], view = [];
 let currentCh = null, curView = 'grid';
 let typeF = 'all', searchQ = '';
 let curSrc = 0;
 const seenIds = new Set();
+const subscriptions = new Set(JSON.parse(localStorage.getItem(STORAGE_KEYS.subs) || '[]'));
+const interestProfile = JSON.parse(localStorage.getItem(STORAGE_KEYS.profile) || '{"types":{},"owners":{},"watch":{}}');
+let liveSnapshot = JSON.parse(localStorage.getItem(STORAGE_KEYS.notifications) || '{}');
 const isMobile = () => window.innerWidth <= 768;
 
-// ══════════════════════════════════════════════
-//  BOOT
-// ══════════════════════════════════════════════
 window.onload = () => {
   setupResponsive();
   showLoading();
+  bindSearch();
   loadAllChannels();
-
-  // Desktop search
-  document.getElementById('desktopSearch').addEventListener('input', e => {
-    searchQ = e.target.value.toLowerCase().trim();
-    applyFilters();
-  });
-  // Mobile drawer search
-  document.getElementById('mobileSearch').addEventListener('input', e => {
-    searchQ = e.target.value.toLowerCase().trim();
-    applyFilters();
-  });
-  // Mobile inline search
-  document.getElementById('mobileSearchInline').addEventListener('input', e => {
-    const q = e.target.value.toLowerCase().trim();
-    renderSearchResults(q);
-  });
-
+  startNotificationPolling();
+  maybeRequestNotificationPermission();
   window.addEventListener('resize', setupResponsive);
+  window.addEventListener('popstate', handleRouteByPath);
 };
+
+function bindSearch() {
+  document.getElementById('desktopSearch').addEventListener('input', e => { searchQ = e.target.value.toLowerCase().trim(); applyFilters(); });
+  document.getElementById('mobileSearch').addEventListener('input', e => { searchQ = e.target.value.toLowerCase().trim(); applyFilters(); });
+  document.getElementById('mobileSearchInline').addEventListener('input', e => renderSearchResults(e.target.value.toLowerCase().trim()));
+}
 
 function setupResponsive() {
   const mobile = isMobile();
-  // Показываем нужные кнопки в хедере
   document.getElementById('btnGrid').style.display   = mobile ? 'none' : 'flex';
   document.getElementById('btnPlayer').style.display = mobile ? 'none' : 'flex';
   document.getElementById('btnBurger').style.display = mobile ? 'flex' : 'none';
 }
 
-// ══════════════════════════════════════════════
-//  API — грузим все страницы
-// ══════════════════════════════════════════════
 async function loadAllChannels() {
   try {
-    const r    = await fetch(API_URL, { method:'GET', headers:{'Accept':'application/json'} });
+    const r = await fetch(API_URL, { method:'GET', headers:{'Accept':'application/json'} });
     const json = await r.json();
     processChannels(extractList(json));
-
     const tp = json.pagination?.total_pages || 1;
-    // Грузим остальные страницы параллельно пачками по 3
     const pages = Array.from({length: tp - 1}, (_, i) => i + 2);
     for (let i = 0; i < pages.length; i += 3) {
-      const batch = pages.slice(i, i + 3);
-      await Promise.all(batch.map(p =>
-        fetch(`${API_URL}?page=${p}&limit=50`, { method:'GET', headers:{'Accept':'application/json'} })
-          .then(r => r.json())
-          .then(json => processChannels(extractList(json)))
-          .catch(() => {})
-      ));
+      await Promise.all(pages.slice(i, i + 3).map(p => fetch(`${API_URL}?page=${p}&limit=50`).then(r => r.json()).then(j => processChannels(extractList(j))).catch(()=>{})));
       await new Promise(r => setTimeout(r, 200));
     }
+    handleRouteByPath();
   } catch(e) {
-    console.error('API error:', e);
     if (allCh.length === 0) showError('Не удалось загрузить каналы: ' + e.message);
   }
 }
 
 function extractList(json) {
   if (Array.isArray(json)) return json;
-  for (const k of ['data','channels','items','results','list','streams']) {
-    if (Array.isArray(json[k])) return json[k];
-  }
+  for (const k of ['data','channels','items','results','list','streams']) if (Array.isArray(json[k])) return json[k];
   return [];
 }
 
 function processChannels(list) {
-  const fresh = list
-    .filter(ch => {
-      const u = (ch.owner?.username || ch.owner || '').toLowerCase();
+  const fresh = list.filter(ch => {
+      const u = String(ch.owner?.username || ch.owner || '').toLowerCase();
       return ALLOWED.some(a => u.includes(a));
     })
-    .filter(ch => {
-      if (seenIds.has(ch.id)) return false;
-      seenIds.add(ch.id);
-      return true;
-    })
+    .filter(ch => (!seenIds.has(ch.id) && seenIds.add(ch.id)))
     .map(ch => ({
-      id:    ch.id,
-      name:  (ch.title || ch.name || '').trim() || 'Без названия',
+      id: ch.id,
+      name: (ch.title || ch.name || '').trim() || 'Без названия',
       thumb: ch.thumbnail_url || ch.logo || '',
-      type:  ch.channel_type || ch.type || 'tv',
-      live:  !!(ch.is_live || ch.live),
+      type: ch.channel_type || ch.type || 'tv',
+      live: !!(ch.is_live || ch.live),
       owner: (typeof ch.owner === 'object' ? ch.owner?.username : ch.owner) || '',
     }));
-
   if (!fresh.length) return;
   allCh.push(...fresh);
   if (!currentCh) currentCh = allCh[0];
   applyFilters();
 }
 
-// ══════════════════════════════════════════════
-//  FILTERS
-// ══════════════════════════════════════════════
 function applyFilters() {
-  view = allCh.filter(ch => {
-    if (typeF !== 'all' && ch.type !== typeF) return false;
-    if (searchQ && !ch.name.toLowerCase().includes(searchQ)) return false;
-    return true;
-  });
+  view = allCh.filter(ch => (typeF === 'all' || ch.type === typeF) && (!searchQ || ch.name.toLowerCase().includes(searchQ)));
   document.getElementById('sbCount').textContent = view.length;
   renderSidebarList();
   if (curView === 'grid') renderGrid();
@@ -633,156 +614,83 @@ function applyFilters() {
 
 function setType(btn, t) {
   typeF = t;
-  document.querySelectorAll('.pill').forEach(b => b.classList.remove('on'));
-  // активируем все кнопки с этим же типом (сайдбар + дравер)
-  document.querySelectorAll('.pill').forEach(b => {
-    const onclick = b.getAttribute('onclick') || '';
-    if (onclick.includes(`'${t}'`)) b.classList.add('on');
-  });
+  document.querySelectorAll('.pill').forEach(b => b.classList.toggle('on', (b.getAttribute('onclick') || '').includes(`'${t}'`)));
   applyFilters();
 }
 
-// ══════════════════════════════════════════════
-//  SIDEBAR LIST (desktop + drawer)
-// ══════════════════════════════════════════════
 function renderSidebarList() {
   ['sidebarList','drawerList'].forEach(listId => {
-    const el = document.getElementById(listId);
-    if (!el) return;
-    el.innerHTML = '';
+    const el = document.getElementById(listId); if (!el) return; el.innerHTML = '';
     view.forEach(ch => {
       const d = document.createElement('div');
       d.className = 'ch-item' + (currentCh?.id === ch.id ? ' on' : '');
       d.dataset.id = ch.id;
-      d.innerHTML = `
-        <div class="ch-logo">${ch.thumb
-          ? `<img src="${esc(ch.thumb)}" onerror="this.style.display='none'">`
-          : esc(ch.name.slice(0,4))}</div>
-        <div class="ch-info">
-          <div class="ch-name">${esc(ch.name)}</div>
-          <div class="ch-meta">${ch.type==='radio'?'📻':'📺'} · ${esc(ch.owner)}</div>
-        </div>
+      d.innerHTML = `<div class="ch-logo">${ch.thumb ? `<img src="${esc(ch.thumb)}" onerror="this.style.display='none'">` : esc(ch.name.slice(0,4))}</div>
+        <div class="ch-info"><div class="ch-name">${esc(ch.name)}</div>
+        <div class="ch-meta">${ch.type==='radio'?'📻':'📺'} · ${esc(ch.owner)} ${subscriptions.has(ch.id)?'<span class="rec-chip">SUB</span>':''}</div></div>
         <div class="${ch.live?'live-pip':'off-pip'}"></div>`;
-      d.onclick = () => {
-        play(ch);
-        if (isMobile()) { closeDrawer(); mobileTab('player'); }
-        else switchView('player');
-      };
+      d.onclick = () => { play(ch, 'sidebar'); isMobile() ? (closeDrawer(), mobileTab('player')) : switchView('player'); };
       el.appendChild(d);
     });
   });
 }
 
-// ══════════════════════════════════════════════
-//  GRID
-// ══════════════════════════════════════════════
 function renderGrid() {
-  const c = document.getElementById('content');
-  if (curView !== 'grid') return;
+  const c = document.getElementById('content'); if (curView !== 'grid') return;
   c.innerHTML = '';
-  const w = document.createElement('div');
-  w.className = 'grid-wrap';
+  const w = document.createElement('div'); w.className = 'grid-wrap';
+  if (!allCh.length) { w.innerHTML = '<div class="state-screen"><div class="loader"></div><span>Загрузка каналов...</span></div>'; c.appendChild(w); return; }
+  if (!view.length) { w.innerHTML = '<div class="state-screen"><span>Ничего не найдено</span></div>'; c.appendChild(w); return; }
 
-  if (!allCh.length) {
-    w.innerHTML = '<div class="state-screen"><div class="loader"></div><span>Загрузка каналов с API...</span></div>';
-    c.appendChild(w); return;
-  }
-  if (!view.length) {
-    w.innerHTML = '<div class="state-screen"><span>Ничего не найдено</span></div>';
-    c.appendChild(w); return;
-  }
-
-  const live  = view.filter(ch => ch.live);
-  const tv    = view.filter(ch => !ch.live && ch.type === 'tv');
+  const recommended = getRecommended(view, currentCh?.id, 12);
+  const live = view.filter(ch => ch.live);
+  const subs = view.filter(ch => subscriptions.has(ch.id));
+  const tv = view.filter(ch => !ch.live && ch.type === 'tv');
   const radio = view.filter(ch => !ch.live && ch.type === 'radio');
 
-  [['🔴 В эфире', live], ['📺 Телеканалы', tv], ['📻 Радиостанции', radio]]
-    .filter(([, items]) => items.length)
-    .forEach(([label, items]) => {
-      const lbl = document.createElement('div');
-      lbl.className = 'sec-lbl'; lbl.textContent = label;
-      w.appendChild(lbl);
-      const g = document.createElement('div');
-      g.className = 'ch-grid';
-      items.forEach(ch => g.appendChild(makeCard(ch)));
-      w.appendChild(g);
+  [['✨ Умная лента', recommended], ['🔔 Подписки', subs], ['🔴 В эфире', live], ['📺 Телеканалы', tv], ['📻 Радиостанции', radio]]
+    .filter(([,items]) => items.length)
+    .forEach(([label,items]) => {
+      const lbl = document.createElement('div'); lbl.className='sec-lbl'; lbl.textContent=label; w.appendChild(lbl);
+      const g = document.createElement('div'); g.className='ch-grid'; items.forEach(ch => g.appendChild(makeCard(ch))); w.appendChild(g);
     });
-
   c.appendChild(w);
 }
 
 function makeCard(ch) {
   const card = document.createElement('div');
   card.className = 'card';
-  card.innerHTML = `
-    <div class="card-thumb">
-      ${ch.thumb ? `<img src="${esc(ch.thumb)}" onerror="this.remove()">` : `<div class="card-fb">${esc(ch.name.slice(0,7))}</div>`}
-      <div class="play-ov"><div class="play-ic">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-      </div></div>
-      <div class="badge ${ch.live?'':'off'}">${ch.live?'LIVE':'OFF'}</div>
-      ${ch.type==='radio'?'<div class="rbadge">RADIO</div>':''}
+  card.innerHTML = `<div class="card-thumb">${ch.thumb ? `<img src="${esc(ch.thumb)}" onerror="this.remove()">` : `<div class="card-fb">${esc(ch.name.slice(0,7))}</div>`}
+      <div class="play-ov"><div class="play-ic"><svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><polygon points="5 3 19 12 5 21 5 3"/></svg></div></div>
+      <div class="badge ${ch.live?'':'off'}">${ch.live?'LIVE':'OFF'}</div>${ch.type==='radio'?'<div class="rbadge">RADIO</div>':''}
+      <button class="sub-btn small ${subscriptions.has(ch.id)?'on':''}" data-sub-id="${ch.id}">${subscriptions.has(ch.id)?'Подписан':'Подписаться'}</button>
     </div>
-    <div class="card-body">
-      <div class="card-name">${esc(ch.name)}</div>
-      <div class="card-sub">${esc(ch.owner)}</div>
-    </div>`;
-  card.onclick = () => {
-    play(ch);
-    if (isMobile()) mobileTab('player');
-    else switchView('player');
-  };
+    <div class="card-body"><div class="card-name">${esc(ch.name)}</div><div class="card-sub">${esc(ch.owner)}</div></div>`;
+  card.setAttribute('data-url', channelPath(ch));
+  card.onclick = (e) => { if (e.target.closest('.sub-btn')) return; play(ch, 'card'); isMobile()?mobileTab('player'):switchView('player'); };
+  card.querySelector('.sub-btn').onclick = (e) => { e.stopPropagation(); toggleSubscription(ch.id); };
   return card;
 }
 
-// ══════════════════════════════════════════════
-//  PLAYER
-// ══════════════════════════════════════════════
-function play(ch) {
+function play(ch, source='unknown') {
   currentCh = ch;
-  document.querySelectorAll('.ch-item').forEach(el =>
-    el.classList.toggle('on', el.dataset.id === ch.id));
+  trackInterest(ch, source);
+  updateSeoForChannel(ch);
+  document.querySelectorAll('.ch-item').forEach(el => el.classList.toggle('on', String(el.dataset.id) === String(ch.id)));
   if (curView === 'player') renderPlayer(ch);
 }
 
 function renderPlayer(ch) {
   const c = document.getElementById('content');
   const embedUrl = SOURCES[curSrc].url(ch.id);
-
-  c.innerHTML = `
-    <div class="player-view">
-      <div class="embed-wrap">
-        <iframe id="embedFrame"
-          src="${esc(embedUrl)}"
-          allowfullscreen
-          allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
-          referrerpolicy="no-referrer-when-downgrade"
-        ></iframe>
+  c.innerHTML = `<div class="player-view"><div class="embed-wrap"><iframe id="embedFrame" src="${esc(embedUrl)}" allowfullscreen allow="autoplay; fullscreen; encrypted-media; picture-in-picture"></iframe></div>
+      <div class="src-bar"><span class="src-lbl">Источник:</span>${SOURCES.map((s,i)=>`<button class="src-btn ${i===curSrc?'on':''}" onclick="switchSrc(${i})">${esc(s.label)}</button>`).join('')}</div>
+      <div class="pib"><div class="pib-logo">${ch.thumb?`<img src="${esc(ch.thumb)}" onerror="this.style.display='none'">`:esc(ch.name.slice(0,3))}</div>
+        <div class="pib-name">${esc(ch.name)}</div><div class="pib-owner">@${esc(ch.owner)}</div><div class="${ch.live?'pib-live':'pib-off'}">${ch.live?'LIVE':'OFF'}</div>
+        <button class="sub-btn ${subscriptions.has(ch.id)?'on':''}" id="playerSubBtn">${subscriptions.has(ch.id)?'Вы подписаны':'Подписаться'}</button>
       </div>
-
-      <div class="src-bar">
-        <span class="src-lbl">Источник:</span>
-        ${SOURCES.map((s, i) => `
-          <button class="src-btn ${i===curSrc?'on':''}" onclick="switchSrc(${i})">
-            ${i===0?'▶ ':'📡 '}${esc(s.label)}
-          </button>`).join('')}
-      </div>
-
-      <div class="pib">
-        <div class="pib-logo">${ch.thumb
-          ? `<img src="${esc(ch.thumb)}" onerror="this.style.display='none'">`
-          : esc(ch.name.slice(0,3))}</div>
-        <div class="pib-name">${esc(ch.name)}</div>
-        <div class="pib-owner">@${esc(ch.owner)}</div>
-        <div class="${ch.live?'pib-live':'pib-off'}">${ch.live?'LIVE':'OFF'}</div>
-      </div>
-
-      <div class="p-related">
-        <div class="sec-lbl">Другие каналы</div>
-        <div class="ch-grid" id="relGrid"></div>
-      </div>
-    </div>`;
-
+      <div class="p-related"><div class="sec-lbl">Рекомендовано для вас</div><div class="ch-grid" id="relGrid"></div></div></div>`;
+  document.getElementById('playerSubBtn').onclick = () => toggleSubscription(ch.id);
   renderRelated(ch);
 }
 
@@ -790,119 +698,158 @@ function switchSrc(idx) {
   curSrc = idx;
   const frame = document.getElementById('embedFrame');
   if (frame && currentCh) frame.src = SOURCES[idx].url(currentCh.id);
-  document.querySelectorAll('.src-btn').forEach((b, i) => b.classList.toggle('on', i === idx));
+  document.querySelectorAll('.src-btn').forEach((b,i)=>b.classList.toggle('on', i===idx));
 }
 
 function renderRelated(current) {
-  const el = document.getElementById('relGrid');
-  if (!el) return;
-  view.filter(c => c.id !== current.id).slice(0, 12).forEach(ch => el.appendChild(makeCard(ch)));
+  const el = document.getElementById('relGrid'); if (!el) return;
+  getRecommended(view.filter(c => c.id !== current.id), current.id, 12).forEach(ch => el.appendChild(makeCard(ch)));
 }
 
-// ══════════════════════════════════════════════
-//  VIEW SWITCHING
-// ══════════════════════════════════════════════
+function getRecommended(pool, excludeId, limit=10) {
+  return [...pool]
+    .filter(ch => ch.id !== excludeId)
+    .map(ch => ({ ch, score: scoreChannel(ch) }))
+    .sort((a,b) => b.score - a.score)
+    .slice(0, limit)
+    .map(x => x.ch);
+}
+
+function scoreChannel(ch) {
+  const typeScore = Number(interestProfile.types?.[ch.type] || 0);
+  const ownerScore = Number(interestProfile.owners?.[ch.owner] || 0);
+  const watchScore = Number(interestProfile.watch?.[ch.id] || 0);
+  const subBonus = subscriptions.has(ch.id) ? 8 : 0;
+  const liveBonus = ch.live ? 1.5 : 0;
+  const searchBoost = searchQ && ch.name.toLowerCase().includes(searchQ) ? 2 : 0;
+  return typeScore + ownerScore + watchScore + subBonus + liveBonus + searchBoost + Math.random() * 0.01;
+}
+
+function trackInterest(ch, source) {
+  interestProfile.types = interestProfile.types || {};
+  interestProfile.owners = interestProfile.owners || {};
+  interestProfile.watch = interestProfile.watch || {};
+  interestProfile.types[ch.type] = (interestProfile.types[ch.type] || 0) + 1;
+  interestProfile.owners[ch.owner] = (interestProfile.owners[ch.owner] || 0) + 0.6;
+  interestProfile.watch[ch.id] = (interestProfile.watch[ch.id] || 0) + 1;
+  localStorage.setItem(STORAGE_KEYS.profile, JSON.stringify(interestProfile));
+}
+
+function toggleSubscription(id) {
+  const wasSub = subscriptions.has(id);
+  wasSub ? subscriptions.delete(id) : subscriptions.add(id);
+  localStorage.setItem(STORAGE_KEYS.subs, JSON.stringify([...subscriptions]));
+  applyFilters();
+  if (currentCh && String(currentCh.id) === String(id) && curView === 'player') renderPlayer(currentCh);
+  const ch = allCh.find(x => String(x.id)===String(id));
+  if (ch) showToast(wasSub ? `Вы отписались от «${ch.name}».` : `Подписка оформлена: «${ch.name}».`);
+}
+
+function channelPath(ch) { return `/public/streamlivetv/${slugify(ch.name)}`; }
+function slugify(text) {
+  const map = { 'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'e','ж':'zh','з':'z','и':'i','й':'y','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u','ф':'f','х':'h','ц':'c','ч':'ch','ш':'sh','щ':'sch','ы':'y','э':'e','ю':'yu','я':'ya','ь':'','ъ':'' };
+  return text.toLowerCase().split('').map(ch => map[ch] ?? ch).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80);
+}
+
+function handleRouteByPath() {
+  const m = window.location.pathname.match(/\/public\/streamlivetv\/([^/]+)/i);
+  if (!m || !allCh.length) return;
+  const slug = m[1];
+  const found = allCh.find(ch => slugify(ch.name) === slug);
+  if (found) { play(found, 'route'); switchView('player'); }
+}
+
+function updateSeoForChannel(ch) {
+  const url = channelPath(ch);
+  if (window.location.pathname !== url) history.replaceState({channelId: ch.id}, '', url);
+  document.title = `${ch.name} — смотреть прямой эфир | StreamLiveTV`;
+  setMeta('description', `Смотрите ${ch.name} онлайн в прямом эфире. Живой канал ${ch.type==='radio'?'радио':'ТВ'}, подборки и рекомендации StreamLiveTV.`);
+  document.getElementById('canonicalLink')?.setAttribute('href', url);
+  document.getElementById('ogTitle')?.setAttribute('content', document.title);
+  document.getElementById('ogDescription')?.setAttribute('content', `Прямой эфир: ${ch.name}. Подпишитесь и получайте live-уведомления.`);
+  document.getElementById('ogUrl')?.setAttribute('content', url);
+  updateStructuredData(ch);
+}
+
+function setMeta(name, content) {
+  let el = document.querySelector(`meta[name="${name}"]`);
+  if (!el) { el = document.createElement('meta'); el.setAttribute('name', name); document.head.appendChild(el); }
+  el.setAttribute('content', content);
+}
+
+function updateStructuredData(ch) {
+  const el = document.getElementById('seoStructuredData'); if (!el) return;
+  el.textContent = JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'TVSeries',
+    name: ch.name,
+    url: channelPath(ch),
+    potentialAction: { '@type': 'WatchAction', target: SOURCES[0].url(ch.id) },
+    genre: ch.type === 'radio' ? 'Radio' : 'TV'
+  });
+}
+
+function maybeRequestNotificationPermission() {
+  if ('Notification' in window && Notification.permission === 'default') setTimeout(() => Notification.requestPermission().catch(()=>{}), 2500);
+}
+
+function startNotificationPolling() {
+  setInterval(checkLiveNotifications, 45000);
+  setTimeout(checkLiveNotifications, 8000);
+}
+
+async function checkLiveNotifications() {
+  if (!subscriptions.size) return;
+  try {
+    const r = await fetch(`${API_URL}?page=1&limit=80`); const json = await r.json();
+    const list = extractList(json).map(ch => ({ id: ch.id, live: !!(ch.is_live || ch.live), name: ch.title || ch.name || 'Канал' }));
+    list.forEach(ch => {
+      const prev = !!liveSnapshot[ch.id];
+      liveSnapshot[ch.id] = ch.live;
+      if (!prev && ch.live && subscriptions.has(ch.id)) {
+        const text = `${ch.name} вышел в live`; showToast(text, true);
+        if ('Notification' in window && Notification.permission === 'granted') new Notification('StreamLiveTV', { body: text });
+      }
+    });
+    localStorage.setItem(STORAGE_KEYS.notifications, JSON.stringify(liveSnapshot));
+  } catch(_) {}
+}
+
+function showToast(text, sticky=false) {
+  const w = document.getElementById('toastWrap'); if (!w) return;
+  const t = document.createElement('div'); t.className = 'toast'; t.innerHTML = `<b>StreamLiveTV</b><div>${esc(text)}</div>`;
+  w.appendChild(t);
+  setTimeout(() => t.remove(), sticky ? 7000 : 3000);
+}
+
 function switchView(v) {
   curView = v;
   document.getElementById('btnGrid')?.classList.toggle('on', v==='grid');
   document.getElementById('btnPlayer')?.classList.toggle('on', v==='player');
-  if (v === 'grid') renderGrid();
-  else if (currentCh) renderPlayer(currentCh);
-  else showNoCh();
+  if (v === 'grid') renderGrid(); else if (currentCh) renderPlayer(currentCh); else showNoCh();
 }
 
-// ══════════════════════════════════════════════
-//  MOBILE TABS
-// ══════════════════════════════════════════════
 function mobileTab(tab) {
   document.querySelectorAll('.bn-tab').forEach(b => b.classList.remove('on'));
-
-  if (tab === 'grid') {
-    document.getElementById('bnHome').classList.add('on');
-    curView = 'grid';
-    renderGrid();
-  } else if (tab === 'player') {
-    document.getElementById('bnPlayer').classList.add('on');
-    curView = 'player';
-    if (currentCh) renderPlayer(currentCh);
-    else showNoCh();
-  } else if (tab === 'search') {
-    document.getElementById('bnSearch').classList.add('on');
-    openMobileSearch();
-    return;
-  }
+  if (tab === 'grid') { document.getElementById('bnHome').classList.add('on'); curView='grid'; renderGrid(); }
+  else if (tab === 'player') { document.getElementById('bnPlayer').classList.add('on'); curView='player'; currentCh ? renderPlayer(currentCh) : showNoCh(); }
+  else if (tab === 'search') { document.getElementById('bnSearch').classList.add('on'); openMobileSearch(); }
 }
 
-// ══════════════════════════════════════════════
-//  MOBILE DRAWER
-// ══════════════════════════════════════════════
-function openDrawer() {
-  document.getElementById('drawer').classList.add('open');
-  document.getElementById('drawerOverlay').classList.add('open');
-  document.body.style.overflow = 'hidden';
-}
-function closeDrawer() {
-  document.getElementById('drawer').classList.remove('open');
-  document.getElementById('drawerOverlay').classList.remove('open');
-  document.body.style.overflow = '';
-}
-
-// ══════════════════════════════════════════════
-//  MOBILE SEARCH
-// ══════════════════════════════════════════════
-function openMobileSearch() {
-  document.getElementById('mobileSearchWrap').style.display = 'block';
-  setTimeout(() => document.getElementById('mobileSearchInline').focus(), 100);
-  renderSearchResults('');
-}
-function closeMobileSearch() {
-  document.getElementById('mobileSearchWrap').style.display = 'none';
-  document.getElementById('mobileSearchInline').value = '';
-  document.getElementById('bnHome').classList.add('on');
-  document.querySelectorAll('.bn-tab').forEach(b => b.classList.remove('on'));
-  document.getElementById('bnHome').classList.add('on');
-}
+function openDrawer() { document.getElementById('drawer').classList.add('open'); document.getElementById('drawerOverlay').classList.add('open'); document.body.style.overflow='hidden'; }
+function closeDrawer() { document.getElementById('drawer').classList.remove('open'); document.getElementById('drawerOverlay').classList.remove('open'); document.body.style.overflow=''; }
+function openMobileSearch() { document.getElementById('mobileSearchWrap').style.display='block'; setTimeout(()=>document.getElementById('mobileSearchInline').focus(), 100); renderSearchResults(''); }
+function closeMobileSearch() { document.getElementById('mobileSearchWrap').style.display='none'; document.getElementById('mobileSearchInline').value=''; document.querySelectorAll('.bn-tab').forEach(b=>b.classList.remove('on')); document.getElementById('bnHome').classList.add('on'); }
 function renderSearchResults(q) {
-  const el = document.getElementById('mobileSearchResults');
-  el.innerHTML = '';
-  const results = q
-    ? allCh.filter(ch => ch.name.toLowerCase().includes(q))
-    : allCh.slice(0, 40);
+  const el = document.getElementById('mobileSearchResults'); el.innerHTML='';
+  const results = q ? allCh.filter(ch => ch.name.toLowerCase().includes(q)) : getRecommended(allCh, null, 40);
   results.forEach(ch => el.appendChild(makeCard(ch)));
 }
 
-// ══════════════════════════════════════════════
-//  STATES
-// ══════════════════════════════════════════════
-function showLoading() {
-  document.getElementById('content').innerHTML =
-    '<div class="state-screen"><div class="loader"></div><span>Загрузка каналов...</span></div>';
-}
-function showError(msg) {
-  document.getElementById('content').innerHTML = `
-    <div class="state-screen">
-      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px 24px;max-width:420px;text-align:center">
-        <div style="font-size:15px;font-weight:700;margin-bottom:8px">Ошибка загрузки</div>
-        <div style="font-size:13px;color:var(--text2);line-height:1.6">${esc(msg)}</div>
-      </div>
-    </div>`;
-}
-function showNoCh() {
-  document.getElementById('content').innerHTML = `
-    <div class="no-ch">
-      <div class="no-ch-icon">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="17 2 12 7 7 2"/>
-        </svg>
-      </div>
-      <h3>Выберите канал</h3>
-      <p>Нажмите на канал в сетке или списке</p>
-    </div>`;
-}
-
-function esc(s) {
-  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+function showLoading() { document.getElementById('content').innerHTML = '<div class="state-screen"><div class="loader"></div><span>Загрузка каналов...</span></div>'; }
+function showError(msg) { document.getElementById('content').innerHTML = `<div class="state-screen"><div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px 24px;max-width:420px;text-align:center"><div style="font-size:15px;font-weight:700;margin-bottom:8px">Ошибка загрузки</div><div style="font-size:13px;color:var(--text2);line-height:1.6">${esc(msg)}</div></div></div>`; }
+function showNoCh() { document.getElementById('content').innerHTML = '<div class="no-ch"><div class="no-ch-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="17 2 12 7 7 2"/></svg></div><h3>Выберите канал</h3><p>Нажмите на канал в сетке или списке</p></div>'; }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 </script>
 </body>
 </html>
