@@ -589,7 +589,11 @@ const REWARD_CATALOG = [
   { id: 'merchRaffle', cost: 250, title: 'Билет в розыгрыш мерча/подписки', durationMs: 14 * 24 * 60 * 60 * 1000, apply: () => ({ raffleTickets: 1 }) },
   { id: 'instantStars', cost: 80, title: 'Мгновенные +15 Stars', durationMs: 0, apply: () => ({ addStars: 15 }) },
   { id: 'liveAlertsPro', cost: 90, title: 'Pro live-уведомления на 72 часа', durationMs: 72 * 60 * 60 * 1000, apply: () => ({ proAlerts: true }) },
-  { id: 'doubleClaimDay', cost: 160, title: 'Удвоенный Stars-тап на 24 часа', durationMs: 24 * 60 * 60 * 1000, apply: () => ({ doubleClaim: true }) }
+  { id: 'doubleClaimDay', cost: 160, title: 'Удвоенный Stars-тап на 24 часа', durationMs: 24 * 60 * 60 * 1000, apply: () => ({ doubleClaim: true }) },
+  { id: 'unlockNeonTheme', cost: 110, title: 'Открыть тему интерфейса Neon Blue', durationMs: 0, apply: () => ({ unlockTheme: 'neon' }) },
+  { id: 'unlockSunsetTheme', cost: 110, title: 'Открыть тему интерфейса Sunset', durationMs: 0, apply: () => ({ unlockTheme: 'sunset' }) },
+  { id: 'unlockEmeraldTheme', cost: 110, title: 'Открыть тему интерфейса Emerald', durationMs: 0, apply: () => ({ unlockTheme: 'emerald' }) },
+  { id: 'smartPack', cost: 200, title: 'Smart-Pack: +40 Stars и x2 тап на 24 часа', durationMs: 24 * 60 * 60 * 1000, apply: () => ({ addStars: 40, doubleClaim: true }) }
 ];
 
 let allCh = [], view = [];
@@ -603,10 +607,16 @@ let liveSnapshot = JSON.parse(localStorage.getItem(STORAGE_KEYS.notifications) |
 let starsState = JSON.parse(localStorage.getItem(STORAGE_KEYS.stars) || '{\"stars\":0,\"nextClaimAt\":0}');
 let rewardBoostUntil = Number(localStorage.getItem(STORAGE_KEYS.rewardBoostUntil) || 0);
 let rewardEffects = JSON.parse(localStorage.getItem(STORAGE_KEYS.rewardEffects) || '{}');
-let appSettings = JSON.parse(localStorage.getItem(STORAGE_KEYS.settings) || '{"stopOnInactivity":true,"inactivityLimitMin":50,"defaultSource":0}');
+let appSettings = JSON.parse(localStorage.getItem(STORAGE_KEYS.settings) || '{"stopOnInactivity":true,"inactivityLimitMin":50,"defaultSource":0,"uiTheme":"default"}');
 let inactivityTimer = null;
 let frameStoppedByInactivity = false;
 const isMobile = () => window.innerWidth <= 768;
+const UI_THEMES = {
+  default: { label: 'Default Red', accent: '#ff4040', bg: '#080c14', bg2: '#0d1220', bg3: '#141926', bg4: '#1a2133', border: '#1e2a40' },
+  neon: { label: 'Neon Blue', accent: '#26c6ff', bg: '#060d18', bg2: '#0c1b2b', bg3: '#13263a', bg4: '#1b3249', border: '#284866' },
+  sunset: { label: 'Sunset', accent: '#ff8c42', bg: '#1a0f0b', bg2: '#24150f', bg3: '#301f18', bg4: '#3f2a21', border: '#5a3a2d' },
+  emerald: { label: 'Emerald', accent: '#3dd68c', bg: '#07130f', bg2: '#0d1f19', bg3: '#143127', bg4: '#1c4536', border: '#2f644f' }
+};
 
 window.onload = () => {
   setupResponsive();
@@ -629,9 +639,17 @@ function initSeoDefaults() {
   document.getElementById('ogUrl')?.setAttribute('content', rootUrl);
   setMeta('description', 'NonStopStream / StreamLiveTV — каталог прямых ТВ и радио эфиров, подписки, рекомендации и live-уведомления.');
   if (/\/public\/streamlivetv\/[^/]+/i.test(path)) {
-    const slug = path.split('/').filter(Boolean).pop().replace(/-/g, ' ');
-    document.title = `${slug} — смотреть онлайн прямой эфир | NonStopStream`;
-    setMeta('description', `Смотрите ${slug} онлайн в прямом эфире на NonStopStream. Подписки, умные рекомендации и уведомления о live.`);
+    const slug = path.split('/').filter(Boolean).pop();
+    const channelName = deSlugify(slug);
+    document.title = `${channelName} — смотреть онлайн прямой эфир | NonStopStream`;
+    setMeta('description', `Смотрите ${channelName} онлайн в прямом эфире на NonStopStream. Подписки, умные рекомендации и уведомления о live.`);
+    setMeta('keywords', `${channelName}, смотреть ${channelName} онлайн, прямой эфир, live тв, nonstopstream`);
+    document.getElementById('ogTitle')?.setAttribute('content', document.title);
+    document.getElementById('ogDescription')?.setAttribute('content', `Прямой эфир канала ${channelName} в каталоге NonStopStream.`);
+    document.getElementById('twitterTitle')?.setAttribute('content', document.title);
+    document.getElementById('twitterDescription')?.setAttribute('content', `Онлайн трансляция ${channelName} на StreamLiveTV.`);
+    document.getElementById('canonicalLink')?.setAttribute('href', `${getBaseUrl()}${path}`);
+    document.getElementById('ogUrl')?.setAttribute('content', `${getBaseUrl()}${path}`);
   }
   const seo = document.getElementById('seoStructuredData');
   if (seo) seo.textContent = JSON.stringify({
@@ -665,7 +683,14 @@ function saveSettings() {
 
 function applyActiveThemeReward() {
   const rewardThemeOn = hasActiveEffect('uniqueTheme');
-  document.documentElement.style.setProperty('--accent', rewardThemeOn ? '#8a5cff' : '#ff4040');
+  const selectedTheme = UI_THEMES[appSettings.uiTheme] ? appSettings.uiTheme : 'default';
+  const theme = rewardThemeOn ? { ...UI_THEMES[selectedTheme], accent: '#8a5cff' } : UI_THEMES[selectedTheme];
+  document.documentElement.style.setProperty('--accent', theme.accent);
+  document.documentElement.style.setProperty('--bg', theme.bg);
+  document.documentElement.style.setProperty('--bg2', theme.bg2);
+  document.documentElement.style.setProperty('--bg3', theme.bg3);
+  document.documentElement.style.setProperty('--bg4', theme.bg4);
+  document.documentElement.style.setProperty('--border', theme.border);
 }
 
 function resetInactivityTimer() {
@@ -838,6 +863,7 @@ function renderPlayer(ch) {
 function renderSettings() {
   const c = document.getElementById('content');
   const inactivityOn = !!appSettings.stopOnInactivity;
+  const unlockedThemes = Array.from(new Set(['default', ...(rewardEffects.unlockedThemes || [])]));
   c.innerHTML = `<div class="grid-wrap">
     <div class="sec-lbl">⚙️ Настройки платформы</div>
     <div class="settings-section">
@@ -853,6 +879,13 @@ function renderSettings() {
       <div class="setting-row">
         <div class="setting-label"><div class="sl-title">Источник по умолчанию</div><div class="sl-desc">Используется при новом открытии плеера.</div></div>
         <select id="sourceDefaultSelect" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 10px;">${SOURCES.map((s, i) => `<option value="${i}" ${Number(appSettings.defaultSource||0)===i?'selected':''}>${esc(s.label)}</option>`).join('')}</select>
+      </div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-title">Интерфейс за Stars</div>
+      <div class="setting-row">
+        <div class="setting-label"><div class="sl-title">Тема приложения</div><div class="sl-desc">Покупай темы в Stars-маркете и переключай здесь.</div></div>
+        <select id="uiThemeSelect" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 10px;">${unlockedThemes.map((key) => `<option value="${key}" ${appSettings.uiTheme===key?'selected':''}>${esc(UI_THEMES[key]?.label || key)}</option>`).join('')}</select>
       </div>
     </div>
     <div class="settings-section">
@@ -877,6 +910,11 @@ function renderSettings() {
     appSettings.defaultSource = Number(e.target.value || 0);
     curSrc = appSettings.defaultSource;
     saveSettings();
+  };
+  document.getElementById('uiThemeSelect').onchange = (e) => {
+    appSettings.uiTheme = e.target.value || 'default';
+    saveSettings();
+    applyActiveThemeReward();
   };
 }
 
@@ -939,6 +977,13 @@ function slugify(text) {
   const map = { 'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'e','ж':'zh','з':'z','и':'i','й':'y','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u','ф':'f','х':'h','ц':'c','ч':'ch','ш':'sh','щ':'sch','ы':'y','э':'e','ю':'yu','я':'ya','ь':'','ъ':'' };
   return text.toLowerCase().split('').map(ch => map[ch] ?? ch).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80);
 }
+function deSlugify(slug) {
+  return String(slug || '')
+    .split('-')
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ') || 'Канал';
+}
 
 function handleRouteByPath() {
   const m = window.location.pathname.match(/\/public\/streamlivetv\/([^/]+)/i);
@@ -972,14 +1017,21 @@ function updateStructuredData(ch) {
   const el = document.getElementById('seoStructuredData'); if (!el) return;
   el.textContent = JSON.stringify({
     '@context': 'https://schema.org',
-    '@type': 'VideoObject',
+    '@type': 'BroadcastService',
     name: ch.name,
     description: `Прямой эфир канала ${ch.name} в каталоге StreamLiveTV.`,
     url: `${getBaseUrl()}${channelPath(ch)}`,
-    potentialAction: { '@type': 'WatchAction', target: SOURCES[0].url(ch.id) },
-    genre: ch.type === 'radio' ? 'Radio' : 'TV',
-    isLiveBroadcast: !!ch.live,
-    publisher: { '@type': 'Organization', name: 'NonStopStream' }
+    inLanguage: 'ru',
+    potentialAction: { '@type': 'WatchAction', target: `${getBaseUrl()}${channelPath(ch)}` },
+    broadcastDisplayName: ch.name,
+    areaServed: 'RU',
+    hasBroadcastChannel: {
+      '@type': 'BroadcastChannel',
+      name: ch.name,
+      genre: ch.type === 'radio' ? 'Radio' : 'TV',
+      isLiveBroadcast: !!ch.live
+    },
+    publisher: { '@type': 'Organization', name: 'NonStopStream', url: `${getBaseUrl()}/public/streamlivetv/` }
   });
 }
 
@@ -1091,8 +1143,8 @@ function renderRewardsCatalog() {
   const wrap = document.getElementById('rewardsList');
   if (!wrap) return;
   wrap.innerHTML = `<b>Варианты обмена Stars:</b>` + REWARD_CATALOG.map(reward => {
-    const disabled = Number(starsState.stars || 0) < reward.cost;
-    return `<div class="reward-row"><span>• ${reward.cost} ⭐ — ${esc(reward.title)}</span><button data-reward="${reward.id}" ${disabled?'disabled':''}>Обменять</button></div>`;
+    const canBuy = Number(starsState.stars || 0) >= reward.cost;
+    return `<div class="reward-row"><span>• ${reward.cost} ⭐ — ${esc(reward.title)}</span><button data-reward="${reward.id}" title="${canBuy ? 'Обменять сейчас' : 'Не хватает Stars'}">${canBuy ? 'Обменять' : 'Не хватает'}</button></div>`;
   }).join('');
   wrap.querySelectorAll('button[data-reward]').forEach(btn => {
     btn.onclick = () => redeemReward(btn.dataset.reward);
@@ -1113,6 +1165,12 @@ function redeemReward(rewardId) {
   if (payload.proAlerts) rewardEffects.proAlertsUntil = Date.now() + reward.durationMs;
   if (payload.doubleClaim) rewardEffects.doubleClaimUntil = Date.now() + reward.durationMs;
   if (payload.raffleTickets) rewardEffects.raffleTickets = Number(rewardEffects.raffleTickets || 0) + payload.raffleTickets;
+  if (payload.unlockTheme) {
+    rewardEffects.unlockedThemes = Array.isArray(rewardEffects.unlockedThemes) ? rewardEffects.unlockedThemes : [];
+    if (!rewardEffects.unlockedThemes.includes(payload.unlockTheme)) rewardEffects.unlockedThemes.push(payload.unlockTheme);
+    appSettings.uiTheme = payload.unlockTheme;
+    saveSettings();
+  }
   if (payload.addStars) starsState.stars += payload.addStars;
   localStorage.setItem(STORAGE_KEYS.rewardEffects, JSON.stringify(rewardEffects));
   localStorage.setItem(STORAGE_KEYS.stars, JSON.stringify(starsState));
@@ -1128,6 +1186,7 @@ function hasActiveEffect(effectKey) {
 }
 
 function pruneRewardEffects() {
+  if (!Array.isArray(rewardEffects.unlockedThemes)) rewardEffects.unlockedThemes = [];
   ['uniqueThemeUntil','proAlertsUntil','doubleClaimUntil'].forEach(k => {
     if (Number(rewardEffects[k] || 0) < Date.now()) delete rewardEffects[k];
   });
