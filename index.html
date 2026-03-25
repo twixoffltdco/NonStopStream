@@ -656,6 +656,21 @@ const UI_THEMES = {
   emerald: { label: 'Emerald', accent: '#3dd68c', bg: '#07130f', bg2: '#0d1f19', bg3: '#143127', bg4: '#1c4536', border: '#2f644f' }
 };
 
+const LEGACY_APP_PATH = '/public/streamlivetv/';
+function getAppBasePath() {
+  const path = window.location.pathname || '/';
+  const legacyIdx = path.toLowerCase().indexOf(LEGACY_APP_PATH);
+  if (legacyIdx >= 0) return LEGACY_APP_PATH;
+  if (path.endsWith('/')) return path;
+  const slashIdx = path.lastIndexOf('/');
+  return slashIdx >= 0 ? `${path.slice(0, slashIdx + 1) || '/'}` : '/';
+}
+function getAppUrl(relative = '') {
+  const cleanBase = getAppBasePath().replace(/\/+$/, '/');
+  const cleanRel = String(relative || '').replace(/^\/+/, '');
+  return cleanRel ? `${cleanBase}${cleanRel}` : cleanBase;
+}
+
 window.onload = () => {
   setupResponsive();
   showLoading();
@@ -671,7 +686,7 @@ window.onload = () => {
 };
 
 function initSeoDefaults() {
-  const rootUrl = `${getBaseUrl()}/public/streamlivetv/`;
+  const rootUrl = `${getBaseUrl()}${getAppUrl()}`;
   const route = getRouteRequest();
   document.getElementById('canonicalLink')?.setAttribute('href', rootUrl);
   document.getElementById('ogUrl')?.setAttribute('content', rootUrl);
@@ -1082,7 +1097,7 @@ function mountIptvMirror(ch, srcMeta) {
     iptvMirrorTry = idx % mirrors.length;
     const base = String(mirrors[iptvMirrorTry] || '').replace(/\/+$/, '');
     const stream = encodeURIComponent(ch.streamUrl);
-    frame.src = `${base}/?url=${stream}`;
+    frame.src = `${base}/?src=${stream}`;
     frame.onerror = () => {
       const next = iptvMirrorTry + 1;
       if (next < mirrors.length) {
@@ -1157,7 +1172,7 @@ function getBaseUrl() { return `${window.location.protocol}//${window.location.h
 function channelPath(ch) {
   const slug = slugify(ch.name);
   const params = new URLSearchParams({ source: ch.catalog || 'streamlivetv', channel: slug });
-  return `/public/streamlivetv/?${params.toString()}`;
+  return `${getAppUrl()}?${params.toString()}`;
 }
 function slugify(text) {
   const map = { 'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'e','ж':'zh','з':'z','и':'i','й':'y','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u','ф':'f','х':'h','ц':'c','ч':'ch','ш':'sh','щ':'sch','ы':'y','э':'e','ю':'yu','я':'ya','ь':'','ъ':'' };
@@ -1183,11 +1198,11 @@ function getRouteRequest() {
   let channel = params.get('channel');
   let source = params.get('source');
   if (!channel) {
-    const legacy = window.location.pathname.match(/\/public\/streamlivetv\/([^/]+)/i);
+    const legacy = window.location.pathname.match(new RegExp(`${LEGACY_APP_PATH.replace(/\//g, '\\/')}([^/]+)`, 'i'));
     if (legacy?.[1]) {
       channel = legacy[1];
       source = 'streamlivetv';
-      const newUrl = `/public/streamlivetv/?source=${encodeURIComponent(source)}&channel=${encodeURIComponent(channel)}`;
+      const newUrl = `${getAppUrl()}?source=${encodeURIComponent(source)}&channel=${encodeURIComponent(channel)}`;
       history.replaceState({}, '', newUrl);
     }
   }
@@ -1233,7 +1248,7 @@ function updateStructuredData(ch) {
       genre: ch.type === 'radio' ? 'Radio' : 'TV',
       isLiveBroadcast: !!ch.live
     },
-    publisher: { '@type': 'Organization', name: 'NonStopStream', url: `${getBaseUrl()}/public/streamlivetv/` }
+    publisher: { '@type': 'Organization', name: 'NonStopStream', url: `${getBaseUrl()}${getAppUrl()}` }
   });
 }
 
