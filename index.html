@@ -124,6 +124,9 @@ body{
 .sec-lbl{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:12px;display:flex;align-items:center;gap:8px}
 .sec-lbl::after{content:'';flex:1;height:1px;background:var(--border)}
 .ch-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:24px}
+.compact-grid .ch-grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+.compact-grid .card-thumb{height:68px}
+.compact-grid .card-body{padding:6px 8px}
 
 .card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;cursor:pointer;transition:all .2s;position:relative;-webkit-tap-highlight-color:transparent}
 .card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.4)}
@@ -628,6 +631,7 @@ const REWARD_CATALOG = [
   { id: 'unlockNeonTheme', cost: 110, title: 'Открыть тему интерфейса Neon Blue', durationMs: 0, apply: () => ({ unlockTheme: 'neon' }) },
   { id: 'unlockSunsetTheme', cost: 110, title: 'Открыть тему интерфейса Sunset', durationMs: 0, apply: () => ({ unlockTheme: 'sunset' }) },
   { id: 'unlockEmeraldTheme', cost: 110, title: 'Открыть тему интерфейса Emerald', durationMs: 0, apply: () => ({ unlockTheme: 'emerald' }) },
+  { id: 'unlockStarsTheme', cost: 150, title: 'Открыть тему интерфейса Stars Galaxy', durationMs: 0, apply: () => ({ unlockTheme: 'stars' }) },
   { id: 'smartPack', cost: 200, title: 'Smart-Pack: +40 Stars и x2 тап на 24 часа', durationMs: 24 * 60 * 60 * 1000, apply: () => ({ addStars: 40, doubleClaim: true }) }
 ];
 
@@ -642,7 +646,7 @@ let liveSnapshot = JSON.parse(localStorage.getItem(STORAGE_KEYS.notifications) |
 let starsState = JSON.parse(localStorage.getItem(STORAGE_KEYS.stars) || '{\"stars\":0,\"nextClaimAt\":0}');
 let rewardBoostUntil = Number(localStorage.getItem(STORAGE_KEYS.rewardBoostUntil) || 0);
 let rewardEffects = JSON.parse(localStorage.getItem(STORAGE_KEYS.rewardEffects) || '{}');
-let appSettings = JSON.parse(localStorage.getItem(STORAGE_KEYS.settings) || '{"stopOnInactivity":true,"inactivityLimitMin":50,"defaultSource":0,"uiTheme":"default"}');
+let appSettings = JSON.parse(localStorage.getItem(STORAGE_KEYS.settings) || '{"stopOnInactivity":true,"inactivityLimitMin":50,"defaultSource":0,"uiTheme":"default","openLastChannelOnStart":true,"compactCards":false}');
 let inactivityTimer = null;
 let frameStoppedByInactivity = false;
 let activeVideoJsPlayer = null;
@@ -653,7 +657,8 @@ const UI_THEMES = {
   default: { label: 'Default Red', accent: '#ff4040', bg: '#080c14', bg2: '#0d1220', bg3: '#141926', bg4: '#1a2133', border: '#1e2a40' },
   neon: { label: 'Neon Blue', accent: '#26c6ff', bg: '#060d18', bg2: '#0c1b2b', bg3: '#13263a', bg4: '#1b3249', border: '#284866' },
   sunset: { label: 'Sunset', accent: '#ff8c42', bg: '#1a0f0b', bg2: '#24150f', bg3: '#301f18', bg4: '#3f2a21', border: '#5a3a2d' },
-  emerald: { label: 'Emerald', accent: '#3dd68c', bg: '#07130f', bg2: '#0d1f19', bg3: '#143127', bg4: '#1c4536', border: '#2f644f' }
+  emerald: { label: 'Emerald', accent: '#3dd68c', bg: '#07130f', bg2: '#0d1f19', bg3: '#143127', bg4: '#1c4536', border: '#2f644f' },
+  stars: { label: 'Stars Galaxy', accent: '#ffd166', bg: '#09061a', bg2: '#110c29', bg3: '#1a1240', bg4: '#24195a', border: '#3f2f82' }
 };
 
 const LEGACY_APP_PATH = '/public/streamlivetv/';
@@ -723,6 +728,15 @@ function bindSearch() {
 }
 
 function initSettings() {
+  appSettings = {
+    stopOnInactivity: true,
+    inactivityLimitMin: 50,
+    defaultSource: 0,
+    uiTheme: 'default',
+    openLastChannelOnStart: true,
+    compactCards: false,
+    ...appSettings
+  };
   curSrc = Number(appSettings.defaultSource || 0);
   const activityEvents = ['mousemove','mousedown','keydown','touchstart','scroll'];
   activityEvents.forEach(evt => window.addEventListener(evt, resetInactivityTimer, { passive: true }));
@@ -930,7 +944,7 @@ function renderSidebarList() {
 function renderGrid() {
   const c = document.getElementById('content'); if (curView !== 'grid') return;
   c.innerHTML = '';
-  const w = document.createElement('div'); w.className = 'grid-wrap';
+  const w = document.createElement('div'); w.className = `grid-wrap${appSettings.compactCards ? ' compact-grid' : ''}`;
   if (!allCh.length) { w.innerHTML = '<div class="state-screen"><div class="loader"></div><span>Загрузка каналов...</span></div>'; c.appendChild(w); return; }
   if (!view.length) { w.innerHTML = '<div class="state-screen"><span>Ничего не найдено</span></div>'; c.appendChild(w); return; }
 
@@ -1025,7 +1039,15 @@ function renderSettings() {
       </div>
     </div>
     <div class="settings-section">
-      <div class="settings-section-title">Новый функционал: быстрые кнопки</div>
+      <div class="settings-section-title">Удобство и запуск</div>
+      <div class="setting-row">
+        <div class="setting-label"><div class="sl-title">Открывать канал из ссылки сразу в плеере</div><div class="sl-desc">Если выключить, канал загрузится в фоне без автоматического перехода.</div></div>
+        <div class="toggle ${appSettings.openLastChannelOnStart ? 'on' : ''}" id="openFromLinkToggle"></div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-label"><div class="sl-title">Компактные карточки каталога</div><div class="sl-desc">Показывает больше каналов на экране.</div></div>
+        <div class="toggle ${appSettings.compactCards ? 'on' : ''}" id="compactCardsToggle"></div>
+      </div>
       <div class="setting-row">
         <button class="tap-secondary" onclick="curView='grid';renderGrid();">Открыть умную ленту</button>
         <button class="tap-secondary" onclick="openBearOverlay(true)">Открыть Stars-маркет</button>
@@ -1051,6 +1073,17 @@ function renderSettings() {
     appSettings.uiTheme = e.target.value || 'default';
     saveSettings();
     applyActiveThemeReward();
+  };
+  document.getElementById('openFromLinkToggle').onclick = () => {
+    appSettings.openLastChannelOnStart = !appSettings.openLastChannelOnStart;
+    saveSettings();
+    renderSettings();
+  };
+  document.getElementById('compactCardsToggle').onclick = () => {
+    appSettings.compactCards = !appSettings.compactCards;
+    saveSettings();
+    renderSettings();
+    if (curView === 'grid') renderGrid();
   };
 }
 
@@ -1171,7 +1204,7 @@ function toggleSubscription(id) {
 function getBaseUrl() { return `${window.location.protocol}//${window.location.host}`; }
 function channelPath(ch) {
   const slug = slugify(ch.name);
-  const params = new URLSearchParams({ source: ch.catalog || 'streamlivetv', channel: slug });
+  const params = new URLSearchParams({ source: ch.catalog || 'streamlivetv', channel: slug, cid: String(ch.id) });
   return `${getAppUrl()}?${params.toString()}`;
 }
 function slugify(text) {
@@ -1187,16 +1220,25 @@ function deSlugify(slug) {
 }
 
 function handleRouteByPath() {
-  const { channel: slug, source } = getRouteRequest();
-  if (!slug || !allCh.length) return;
-  const found = allCh.find(ch => slugify(ch.name) === slug && (!source || ch.catalog === source));
-  if (found) { play(found, 'route'); switchView('player'); }
+  const { channel: slug, source, cid } = getRouteRequest();
+  if ((!slug && !cid) || !allCh.length) return;
+  const byId = cid ? allCh.find(ch => String(ch.id) === String(cid) && (!source || ch.catalog === source)) : null;
+  const normalizedSlug = String(slug || '').toLowerCase();
+  const bySlug = !byId && normalizedSlug
+    ? allCh.find(ch => slugify(ch.name).toLowerCase() === normalizedSlug && (!source || ch.catalog === source))
+    : null;
+  const found = byId || bySlug;
+  if (found) {
+    play(found, 'route');
+    if (appSettings.openLastChannelOnStart !== false) switchView('player');
+  }
 }
 
 function getRouteRequest() {
   const params = new URLSearchParams(window.location.search);
   let channel = params.get('channel');
   let source = params.get('source');
+  let cid = params.get('cid');
   if (!channel) {
     const legacy = window.location.pathname.match(new RegExp(`${LEGACY_APP_PATH.replace(/\//g, '\\/')}([^/]+)`, 'i'));
     if (legacy?.[1]) {
@@ -1206,7 +1248,7 @@ function getRouteRequest() {
       history.replaceState({}, '', newUrl);
     }
   }
-  return { channel, source };
+  return { channel, source, cid };
 }
 
 function updateSeoForChannel(ch) {
